@@ -1,3 +1,5 @@
+use crate::RdxApp;
+
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -7,6 +9,9 @@ pub struct TemplateApp {
 
     #[serde(skip)] // This how you opt-out of serialization of a field
     value: f32,
+
+    #[serde(skip)]
+    rdx: RdxApp,
 }
 
 impl Default for TemplateApp {
@@ -15,6 +20,7 @@ impl Default for TemplateApp {
             // Example stuff:
             label: "Hello World!".to_owned(),
             value: 2.7,
+            rdx: RdxApp::default(),
         }
     }
 }
@@ -89,6 +95,30 @@ impl eframe::App for TemplateApp {
             ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
                 powered_by_egui_and_eframe(ui);
                 egui::warn_if_debug_build(ui);
+            });
+        });
+
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            // Left panel with the RDX source code
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::multiline(&mut self.rdx.source())
+                        .desired_width(ui.available_width() * 0.5)
+                        .desired_rows(30)
+                        .font(egui::TextStyle::Monospace),
+                );
+
+                ui.vertical(|ui| {
+                    if ui.button("Update").clicked() {
+                        tracing::info!("Updating components");
+                        self.rdx.update_components();
+                    }
+
+                    ui.add_space(20.0);
+
+                    // Render the components
+                    self.rdx.render_component(ui, self.rdx.components());
+                });
             });
         });
     }

@@ -1,0 +1,31 @@
+//! Parse <Horizontal> into egui layout
+
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+
+QUOTED_STRING = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+UNQUOTED_VALUE = { (ASCII_ALPHANUMERIC | "-" | "_" | ".")+ }
+
+/// Identifier (for tag names and attribute names)
+identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// String literals
+inner_string = @{ (!("\"") ~ ANY)* }
+string = _{ "\"" ~ inner_string ~ "\"" }
+
+// Attribute
+attribute = { identifier ~ "=" ~ string }
+
+/// Tag name such as "Horizontal" or "Button"
+tag_name = @{ ASCII_ALPHA+ }
+text = { (!("<" | ">") ~ ANY)+ }
+
+/// Open Tag such as <Horizontal>
+open_tag = { "<" ~ identifier ~ (WHITESPACE* ~ attribute)* ~ ">" }
+
+/// Close Tag such as </Horizontal>
+close_tag = { "</" ~ identifier ~ ">" }
+
+/// An entire element, such as <Horizontal> or <Button onClick="increment">Click me!</Button> and <Button color="red">Click me!</Button>
+element = { open_tag ~ (element | text)* ~ close_tag }
+
+document = { SOI ~ element ~ EOI }
