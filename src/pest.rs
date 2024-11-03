@@ -26,6 +26,8 @@ pub enum Component {
     Button {
         content: Option<String>,
         props: HashMap<String, String>,
+        /// function name and list of arguments
+        functions: HashMap<String, Vec<String>>,
     },
     Label {
         content: String,
@@ -38,6 +40,7 @@ pub enum Component {
 }
 
 fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Error> {
+    let span = pair.as_span();
     match pair.as_rule() {
         Rule::document => {
             let inner = pair.clone().into_inner();
@@ -50,18 +53,66 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
             Ok(Component::Document { children })
         }
         Rule::element => {
-            let mut inner = pair.clone().into_inner();
-            let open_tag = inner.next().unwrap();
-            let mut tag_inner = open_tag.into_inner();
-            let tag_name = tag_inner.next().unwrap().as_str();
+            let mut inner = pair.into_inner();
 
             let mut props = HashMap::default();
+            let mut functions = HashMap::default();
 
-            for p in tag_inner.filter(|p| p.as_rule() == Rule::attribute) {
+            let tag_name = inner
+                .clone()
+                .filter_map(|p| match p.as_rule() {
+                    Rule::open_tag => p
+                        .into_inner() // <== tag_inner
+                        .filter_map(|p| match p.as_rule() {
+                            Rule::identifier => Some(p.as_str()),
+                            _ => None,
+                        })
+                        .next(),
+                    _ => None,
+                })
+                .next()
+                .unwrap();
+
+            // let open_tag = inner.next().unwrap();
+            // let tag_inner = open_tag.into_inner();
+            // let tag_name = tag_inner.next().unwrap().as_str();
+
+            for p in inner
+                .next() // <== open_tag
+                .unwrap()
+                .into_inner() // <== tag_inner
+                .filter(|p| p.as_rule() == Rule::attribute)
+            {
                 let mut attr_inner = p.into_inner();
                 let name = attr_inner.next().unwrap().as_str().to_string();
-                let value = attr_inner.next().unwrap().as_str().to_string();
-                props.insert(name, value);
+                let value = attr_inner.next().unwrap();
+                match value.as_rule() {
+                    Rule::string | Rule::inner_string => {
+                        props.insert(name, value.as_str().to_string());
+                    }
+                    Rule::functions => {
+                        let mut func_inner = value.into_inner();
+                        let func_name = func_inner.next().unwrap().as_str().to_string();
+                        let args = func_inner
+                            .filter_map(|p| match p.as_rule() {
+                                Rule::string => Some(p.as_str().to_string()),
+                                _ => None,
+                            })
+                            .collect();
+                        functions.insert(func_name, args);
+                    }
+                    _ => {
+                        return Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
+                            pest::error::ErrorVariant::CustomError {
+                                message: format!(
+                                    "Expected string or function call, got {:?}",
+                                    value
+                                ),
+                            },
+                            value.as_span(),
+                        ))))
+                    }
+                }
             }
 
             // content is Rule::text, if any
@@ -102,7 +153,11 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                     props,
                     children,
                 },
-                "Button" => Component::Button { content, props },
+                "Button" => Component::Button {
+                    content,
+                    props,
+                    functions,
+                },
                 "Label" => Component::Label {
                     content: content.unwrap(),
                     props,
@@ -112,20 +167,18 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                         pest::error::ErrorVariant::CustomError {
                             message: format!("Unknown tag: {}", tag_name),
                         },
-                        pair.as_span(),
+                        span,
                     ))))
                 }
             };
             Ok(res)
         }
-        _ => {
-            return Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
-                pest::error::ErrorVariant::CustomError {
-                    message: format!("Expected element, got {:?}", pair.as_rule()),
-                },
-                pair.as_span(),
-            ))))
-        }
+        _ => Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
+            pest::error::ErrorVariant::CustomError {
+                message: format!("Expected element, got {:?}", pair.as_rule()),
+            },
+            span,
+        )))),
     }
 }
 
@@ -140,6 +193,15 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
+
+    fn init_logger() {
+        let subscriber = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .finish();
+        if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+            tracing::warn!("failed to set subscriber: {}", e);
+        }
+    }
 
     #[test]
     fn test_parse_and_generate() {
@@ -179,6 +241,7 @@ mod tests {
                         Component::Button {
                             content: Some("Click me!".to_string()),
                             props: HashMap::default(),
+                            functions: HashMap::default(),
                         },
                         Component::Vertical {
                             content: None,
@@ -196,6 +259,8 @@ mod tests {
 
     #[test]
     fn parse_with_property_attributes() {
+        tracing::info!("*** Starting test ***");
+
         let input = r#"
             <Horizontal>
                 <Button color="red">Click me!</Button>
@@ -217,12 +282,92 @@ mod tests {
                             props: vec![("color".to_string(), "red".to_string())]
                                 .into_iter()
                                 .collect(),
+                            functions: HashMap::default(),
                         },
                         Component::Vertical {
                             content: None,
                             props: HashMap::default(),
                             children: vec![Component::Label {
                                 content: "Hello, world!".to_string(),
+                                props: HashMap::default()
+                            }]
+                        }
+                    ]
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn test_on_click_attr() {
+        let input = r#"
+            <Horizontal>
+                <Button on_click="handle_click">Click me!</Button>
+                <Vertical>
+                    <Label>Hello, world!</Label>
+                </Vertical>
+            </Horizontal>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            Component::Document {
+                children: vec![Component::Horizontal {
+                    content: None,
+                    props: HashMap::default(),
+                    children: vec![
+                        Component::Button {
+                            content: Some("Click me!".to_string()),
+                            props: vec![("on_click".to_string(), "handle_click".to_string())]
+                                .into_iter()
+                                .collect(),
+                            functions: HashMap::default(),
+                        },
+                        Component::Vertical {
+                            content: None,
+                            props: HashMap::default(),
+                            children: vec![Component::Label {
+                                content: "Hello, world!".to_string(),
+                                props: HashMap::default()
+                            }]
+                        }
+                    ]
+                }]
+            }
+        );
+    }
+
+    // test function calls as attributes (increment button)
+    #[test]
+    fn test_function_call_attr() {
+        let input = r#"
+            <Horizontal>
+                <Button on_click=increment()>Increment</Button>
+                <Vertical>
+                    <Label>{count}</Label>
+                </Vertical>
+            </Horizontal>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            Component::Document {
+                children: vec![Component::Horizontal {
+                    content: None,
+                    props: HashMap::default(),
+                    children: vec![
+                        Component::Button {
+                            content: Some("Increment".to_string()),
+                            props: Default::default(),
+                            functions: vec![("increment".to_string(), vec![])]
+                                .into_iter()
+                                .collect(),
+                        },
+                        Component::Vertical {
+                            content: None,
+                            props: HashMap::default(),
+                            children: vec![Component::Label {
+                                content: "{count}".to_string(),
                                 props: HashMap::default()
                             }]
                         }
