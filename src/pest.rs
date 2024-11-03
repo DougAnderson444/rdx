@@ -10,9 +10,6 @@ struct EguiLayoutParser;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Component {
-    Document {
-        children: Vec<Component>,
-    },
     Horizontal {
         content: Option<String>,
         props: HashMap<String, String>,
@@ -42,16 +39,6 @@ pub enum Component {
 fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Error> {
     let span = pair.as_span();
     match pair.as_rule() {
-        Rule::document => {
-            let inner = pair.clone().into_inner();
-            let children: Vec<Component> = inner
-                .filter_map(|p| match p.as_rule() {
-                    Rule::element => Some(parse_element(p)),
-                    _ => None,
-                })
-                .collect::<Result<_, _>>()?;
-            Ok(Component::Document { children })
-        }
         Rule::element => {
             let mut inner = pair.into_inner();
 
@@ -182,10 +169,22 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
     }
 }
 
-pub(crate) fn parse(input: &str) -> Result<Component, Error> {
+pub(crate) fn parse(input: &str) -> Result<Vec<Component>, Error> {
+    let mut ast = vec![];
+
     let pairs =
         EguiLayoutParser::parse(Rule::document, input).map_err(|e| Error::Parse(Box::new(e)))?;
-    parse_element(pairs.peek().unwrap())
+
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::element => {
+                ast.push(parse_element(pair)?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ast)
 }
 
 #[cfg(test)]
@@ -210,13 +209,11 @@ mod tests {
         let res = parse(input).unwrap();
         assert_eq!(
             res,
-            Component::Document {
-                children: vec![Component::Horizontal {
-                    content: None,
-                    props: HashMap::default(),
-                    children: vec![]
-                }]
-            }
+            vec![Component::Horizontal {
+                content: None,
+                props: HashMap::default(),
+                children: vec![]
+            }]
         );
     }
 
@@ -233,27 +230,25 @@ mod tests {
         let res = parse(input).unwrap();
         assert_eq!(
             res,
-            Component::Document {
-                children: vec![Component::Horizontal {
-                    content: None,
-                    props: HashMap::default(),
-                    children: vec![
-                        Component::Button {
-                            content: Some("Click me!".to_string()),
+            vec![Component::Horizontal {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::Button {
+                        content: Some("Click me!".to_string()),
+                        props: HashMap::default(),
+                        functions: HashMap::default(),
+                    },
+                    Component::Vertical {
+                        content: None,
+                        props: HashMap::default(),
+                        children: vec![Component::Label {
+                            content: "Hello, world!".to_string(),
                             props: HashMap::default(),
-                            functions: HashMap::default(),
-                        },
-                        Component::Vertical {
-                            content: None,
-                            props: HashMap::default(),
-                            children: vec![Component::Label {
-                                content: "Hello, world!".to_string(),
-                                props: HashMap::default()
-                            }]
-                        }
-                    ]
-                }]
-            }
+                        }]
+                    }
+                ]
+            }]
         );
     }
 
@@ -272,29 +267,27 @@ mod tests {
         let res = parse(input).unwrap();
         assert_eq!(
             res,
-            Component::Document {
-                children: vec![Component::Horizontal {
-                    content: None,
-                    props: HashMap::default(),
-                    children: vec![
-                        Component::Button {
-                            content: Some("Click me!".to_string()),
-                            props: vec![("color".to_string(), "red".to_string())]
-                                .into_iter()
-                                .collect(),
-                            functions: HashMap::default(),
-                        },
-                        Component::Vertical {
-                            content: None,
-                            props: HashMap::default(),
-                            children: vec![Component::Label {
-                                content: "Hello, world!".to_string(),
-                                props: HashMap::default()
-                            }]
-                        }
-                    ]
-                }]
-            }
+            vec![Component::Horizontal {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::Button {
+                        content: Some("Click me!".to_string()),
+                        props: vec![("color".to_string(), "red".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: HashMap::default(),
+                    },
+                    Component::Vertical {
+                        content: None,
+                        props: HashMap::default(),
+                        children: vec![Component::Label {
+                            content: "Hello, world!".to_string(),
+                            props: HashMap::default()
+                        }]
+                    }
+                ]
+            }]
         );
     }
 
@@ -311,29 +304,27 @@ mod tests {
         let res = parse(input).unwrap();
         assert_eq!(
             res,
-            Component::Document {
-                children: vec![Component::Horizontal {
-                    content: None,
-                    props: HashMap::default(),
-                    children: vec![
-                        Component::Button {
-                            content: Some("Click me!".to_string()),
-                            props: vec![("on_click".to_string(), "handle_click".to_string())]
-                                .into_iter()
-                                .collect(),
-                            functions: HashMap::default(),
-                        },
-                        Component::Vertical {
-                            content: None,
+            vec![Component::Horizontal {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::Button {
+                        content: Some("Click me!".to_string()),
+                        props: vec![("on_click".to_string(), "handle_click".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: HashMap::default(),
+                    },
+                    Component::Vertical {
+                        content: None,
+                        props: HashMap::default(),
+                        children: vec![Component::Label {
+                            content: "Hello, world!".to_string(),
                             props: HashMap::default(),
-                            children: vec![Component::Label {
-                                content: "Hello, world!".to_string(),
-                                props: HashMap::default()
-                            }]
-                        }
-                    ]
-                }]
-            }
+                        }]
+                    }
+                ]
+            }]
         );
     }
 
@@ -344,36 +335,34 @@ mod tests {
             <Horizontal>
                 <Button on_click=increment()>Increment</Button>
                 <Vertical>
-                    <Label>{count}</Label>
+                    <Label>{{count}}</Label>
                 </Vertical>
             </Horizontal>
         "#;
         let res = parse(input).unwrap();
         assert_eq!(
             res,
-            Component::Document {
-                children: vec![Component::Horizontal {
-                    content: None,
-                    props: HashMap::default(),
-                    children: vec![
-                        Component::Button {
-                            content: Some("Increment".to_string()),
-                            props: Default::default(),
-                            functions: vec![("increment".to_string(), vec![])]
-                                .into_iter()
-                                .collect(),
-                        },
-                        Component::Vertical {
-                            content: None,
+            vec![Component::Horizontal {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::Button {
+                        content: Some("Increment".to_string()),
+                        props: Default::default(),
+                        functions: vec![("increment".to_string(), vec![])]
+                            .into_iter()
+                            .collect(),
+                    },
+                    Component::Vertical {
+                        content: None,
+                        props: HashMap::default(),
+                        children: vec![Component::Label {
+                            content: "{count}".to_string(),
                             props: HashMap::default(),
-                            children: vec![Component::Label {
-                                content: "{count}".to_string(),
-                                props: HashMap::default()
-                            }]
-                        }
-                    ]
-                }]
-            }
+                        }]
+                    }
+                ]
+            }]
         );
     }
 }

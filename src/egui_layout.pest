@@ -5,19 +5,19 @@ WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
 /// Identifier (for tag names and attribute names)
 identifier = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
-/// Function call
-functions = { identifier ~ "(" ~ (string)* ~ ")" }
-
-// String literals (without quotes or special chars, especially not "(" or ")")
+// without quotes or special chars, especially not "(" or ")"
 inner_string = @{ (!("\"" | "<" | ">" | "(" | ")") ~ ANY)+ }
 
-/// String literals (with quotes)
+/// _SILENT Rule: Doesn't produce Rule:: token. Str literals (with quotes)
 string = _{ "\"" ~ inner_string ~ "\"" }
+
+/// Function call
+functions = { identifier ~ "(" ~ (string)* ~ ")" }
 
 // Attribute cn be either a string or a function call, but musy have one of them
 attribute = { identifier ~ "=" ~ (string | functions) }
 
-/// Tag name such as "Horizontal" or "Button"
+/// Non-element contents
 text = { (!("<" | ">") ~ ANY)+ }
 
 /// Open Tag such as <Horizontal>
@@ -29,4 +29,4 @@ close_tag = { "</" ~ identifier ~ ">" }
 /// An entire element, such as <Horizontal> or <Button on_click="increment()">Increment</Button>
 element = { open_tag ~ (element | text)* ~ close_tag }
 
-document = { SOI ~ element ~ EOI }
+document = _{ SOI ~ element ~ EOI }

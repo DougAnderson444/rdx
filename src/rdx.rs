@@ -15,7 +15,7 @@ impl Inner for State {}
 pub struct RdxApp {
     engine: Engine,
     scope: Scope<'static>,
-    components: Component,
+    components: Vec<Component>,
     rdx_source: String,
 }
 
@@ -49,71 +49,64 @@ impl RdxApp {
         &self.rdx_source
     }
 
-    pub fn components(&self) -> &Component {
+    pub fn components(&self) -> &Vec<Component> {
         &self.components
     }
 
-    pub fn render_component(&self, ui: &mut egui::Ui, component: &Component) {
-        match component {
-            Component::Document { children } => {
-                for child in children {
-                    self.render_component(ui, child);
+    pub fn render_component(&self, ui: &mut egui::Ui, components: &Vec<Component>) {
+        for component in components {
+            match component {
+                Component::Vertical { children, .. } => {
+                    ui.vertical(|ui| {
+                        self.render_component(ui, children);
+                    });
                 }
-            }
-            Component::Vertical { children, .. } => {
-                ui.vertical(|ui| {
-                    for child in children {
-                        self.render_component(ui, child);
-                    }
-                });
-            }
-            Component::Horizontal { children, .. } => {
-                ui.horizontal(|ui| {
-                    for child in children {
-                        self.render_component(ui, child);
-                    }
-                });
-            }
-            Component::Button {
-                content,
-                props,
-                functions,
-            } => {
-                let color = match props.get("color").map(|s| s.as_str()) {
-                    Some("green") => egui::Color32::from_rgb(100, 200, 100),
-                    Some("red") => egui::Color32::from_rgb(200, 100, 100),
-                    _ => ui.style().visuals.widgets.active.bg_fill,
-                };
-
-                let text = content.clone().unwrap_or("".to_string());
-                if ui.add(egui::Button::new(&text).fill(color)).clicked() {
-                    if let Some(on_click) = props.get("onClick") {
-                        self.engine
-                            .eval_with_scope::<Dynamic>(&mut self.scope.clone(), on_click)
-                            .ok();
-                    }
+                Component::Horizontal { children, .. } => {
+                    ui.horizontal(|ui| {
+                        self.render_component(ui, children);
+                    });
                 }
-                ui.add_space(4.0);
-            }
-            Component::Label { content, props } => {
-                let size = match props.get("size").map(|s| s.as_str()) {
-                    Some("small") => 14.0,
-                    Some("large") => 18.0,
-                    _ => 16.0,
-                };
+                Component::Button {
+                    content,
+                    props,
+                    functions,
+                } => {
+                    let color = match props.get("color").map(|s| s.as_str()) {
+                        Some("green") => egui::Color32::from_rgb(100, 200, 100),
+                        Some("red") => egui::Color32::from_rgb(200, 100, 100),
+                        _ => ui.style().visuals.widgets.active.bg_fill,
+                    };
 
-                ui.label(egui::RichText::new(content.clone()).size(size));
-                ui.add_space(4.0);
-            }
-            Component::Text { content, props } => {
-                let size = match props.get("size").map(|s| s.as_str()) {
-                    Some("small") => 14.0,
-                    Some("large") => 18.0,
-                    _ => 16.0,
-                };
+                    let text = content.clone().unwrap_or("".to_string());
+                    if ui.add(egui::Button::new(&text).fill(color)).clicked() {
+                        if let Some(on_click) = props.get("onClick") {
+                            self.engine
+                                .eval_with_scope::<Dynamic>(&mut self.scope.clone(), on_click)
+                                .ok();
+                        }
+                    }
+                    ui.add_space(4.0);
+                }
+                Component::Label { content, props } => {
+                    let size = match props.get("size").map(|s| s.as_str()) {
+                        Some("small") => 14.0,
+                        Some("large") => 18.0,
+                        _ => 16.0,
+                    };
 
-                ui.label(egui::RichText::new(content.clone()).size(size));
-                ui.add_space(4.0);
+                    ui.label(egui::RichText::new(content.clone()).size(size));
+                    ui.add_space(4.0);
+                }
+                Component::Text { content, props } => {
+                    let size = match props.get("size").map(|s| s.as_str()) {
+                        Some("small") => 14.0,
+                        Some("large") => 18.0,
+                        _ => 16.0,
+                    };
+
+                    ui.label(egui::RichText::new(content.clone()).size(size));
+                    ui.add_space(4.0);
+                }
             }
         }
     }
@@ -131,7 +124,7 @@ impl RdxApp {
             Ok(result) => {
                 // parse the result as string and set self.components if parse is ok
                 let s = result.to_string();
-                let res: Component = parse(&s).unwrap();
+                let res = parse(&s).unwrap();
                 self.components = res;
             }
             Err(e) => {
