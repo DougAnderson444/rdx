@@ -7,4 +7,8 @@ pub enum Error {
 
     #[error("Parse error: {0}")]
     Parse(#[from] Box<pest::error::Error<Rule>>),
+
+    /// Wasmtime error
+    #[error("Anyhow Error: {0}")]
+    Wasmtime(#[from] wasmtime::Error),
 }

@@ -1,10 +1,13 @@
+[workspace]
+members = [".", "examples/counter"]
+
 [package]
 name = "rdx"
 version = "0.1.0"
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
-rust-version = "1.76"
+rust-version = "1.78"                                                # Minimum version required to build this project, for wasm-wsip1 target, 1.78 minimum is required.
 
 [package.metadata.docs.rs]
 all-features = true
@@ -29,6 +32,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
 
+# TODO: Feature gate this:
+wasmtime = { version = "25" }
+wasmtime-wasi = { version = "25" }
+wasi-common = { version = "25.0.1", features = ["tokio"] }
+
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -43,6 +51,11 @@ rhai = { version = "1.19", features = ["wasm-bindgen"] }
 
 [profile.release]
 opt-level = 2 # fast and small wasm
+# codegen-units = 1
+# opt-level = "s"
+# debug = false
+# strip = true
+# lto = true
 
 # Optimize all dependencies even in debug builds:
 [profile.dev.package."*"]
