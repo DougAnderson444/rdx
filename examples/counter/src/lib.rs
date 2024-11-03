@@ -23,8 +23,8 @@ impl Guest for Counter {
     fn load() -> String {
         r#"
             <Vertical>
-                <Button on_click="increment()">Increment</Button>
-                <Button on_click="decrement()">Decrement</Button>
+                <Button on_click=increment()>Increment</Button>
+                <Button on_click=decrement()>Decrement</Button>
                 <Label>{count}</Label>
             </Vertical>
         "#
