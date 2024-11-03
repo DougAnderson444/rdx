@@ -1,0 +1,38 @@
+package component:plugin;
+
+interface types {
+  /// The Event type.
+  record event {
+    /// The count 
+    count: s32
+  }
+}
+
+interface provider {
+
+  resource counter {
+    /// Constructs a new graph.
+    constructor();
+
+    /// Increments the counter.
+    increment: func() -> s32;
+
+    /// Decrements the counter.
+    decrement: func() -> s32;
+  }
+}
+
+/// An example world for the component to target.
+world plugin-world {
+
+  use types.{event};
+
+  /// Import the event handler.
+  import emit: func(evt: event);
+  
+  /// Returns the RDX script.
+  export load: func() -> string;
+
+  /// Export the provided component 
+  export provider;
+}
