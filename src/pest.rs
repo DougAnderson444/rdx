@@ -2,7 +2,7 @@ use pest::Parser;
 use pest_derive::Parser;
 use std::collections::HashMap;
 
-use crate::Error;
+use crate::{template::Template, Error};
 
 #[derive(Parser)]
 #[grammar = "egui_layout.pest"]
@@ -28,6 +28,7 @@ pub enum Component {
     },
     Label {
         content: String,
+        template: Option<Template>,
         props: HashMap<String, String>,
     },
     Text {
@@ -129,6 +130,19 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                 })
                 .collect::<Result<_, _>>()?;
 
+            // make a new Template from the content. If there is a TeplatePart::Dynamic, then
+            // we have a template. Otherwise, it's just a string so set template to None.
+            let template = content
+                .as_ref()
+                .map(|c| Template::new(c))
+                .filter(|t| {
+                    t.parts
+                        .iter()
+                        .any(|p| matches!(p, crate::template::TemplatePart::Dynamic(_)))
+                })
+                .map(Some)
+                .unwrap_or(None);
+
             let res = match tag_name {
                 "Horizontal" => Component::Horizontal {
                     content,
@@ -148,6 +162,7 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                 "Label" => Component::Label {
                     content: content.unwrap(),
                     props,
+                    template,
                 },
                 _ => {
                     return Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
@@ -176,11 +191,8 @@ pub(crate) fn parse(input: &str) -> Result<Vec<Component>, Error> {
         EguiLayoutParser::parse(Rule::document, input).map_err(|e| Error::Parse(Box::new(e)))?;
 
     for pair in pairs {
-        match pair.as_rule() {
-            Rule::element => {
-                ast.push(parse_element(pair)?);
-            }
-            _ => {}
+        if pair.as_rule() == Rule::element {
+            ast.push(parse_element(pair)?);
         }
     }
 
@@ -245,6 +257,7 @@ mod tests {
                         children: vec![Component::Label {
                             content: "Hello, world!".to_string(),
                             props: HashMap::default(),
+                            template: None,
                         }]
                     }
                 ]
@@ -283,7 +296,8 @@ mod tests {
                         props: HashMap::default(),
                         children: vec![Component::Label {
                             content: "Hello, world!".to_string(),
-                            props: HashMap::default()
+                            props: HashMap::default(),
+                            template: None,
                         }]
                     }
                 ]
@@ -321,6 +335,7 @@ mod tests {
                         children: vec![Component::Label {
                             content: "Hello, world!".to_string(),
                             props: HashMap::default(),
+                            template: None,
                         }]
                     }
                 ]
@@ -335,7 +350,7 @@ mod tests {
             <Horizontal>
                 <Button on_click=increment()>Increment</Button>
                 <Vertical>
-                    <Label>{{count}}</Label>
+                    <Label>The count is {{count}}</Label>
                 </Vertical>
             </Horizontal>
         "#;
@@ -357,8 +372,9 @@ mod tests {
                         content: None,
                         props: HashMap::default(),
                         children: vec![Component::Label {
-                            content: "{count}".to_string(),
+                            content: "The count is {{count}}".to_string(),
                             props: HashMap::default(),
+                            template: Some(Template::new("The count is {{count}}")),
                         }]
                     }
                 ]

@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use crate::pest::{parse, Component};
 use crate::plugins::{Environment, Inner, Plugin};
+use crate::template::TemplatePart;
 use crate::utils;
 
 use rhai::{Dynamic, Engine, Scope};
@@ -32,7 +35,10 @@ impl Default for RdxApp {
 
         let engine = Engine::new();
 
-        let scope = Scope::new();
+        let mut scope = Scope::new();
+
+        // set scope count var to 0
+        scope.set_or_push("count", 0);
 
         Self {
             engine,
@@ -87,14 +93,32 @@ impl RdxApp {
                     }
                     ui.add_space(4.0);
                 }
-                Component::Label { content, props } => {
+                Component::Label {
+                    content,
+                    props,
+                    template,
+                } => {
                     let size = match props.get("size").map(|s| s.as_str()) {
                         Some("small") => 14.0,
                         Some("large") => 18.0,
                         _ => 16.0,
                     };
 
-                    ui.label(egui::RichText::new(content.clone()).size(size));
+                    let content = if let Some(template) = template {
+                        // let mut values = std::collections::HashMap::new();
+                        // for part in &template.parts {
+                        //     if let TemplatePart::Dynamic(key) = part {
+                        //         if let Some(value) = self.scope.get_value::<String>(&key) {
+                        //             values.insert(key.clone(), value.clone());
+                        //         }
+                        //     }
+                        // }
+                        template.render(self.scope.iter_raw())
+                    } else {
+                        content.to_string()
+                    };
+
+                    ui.label(egui::RichText::new(content).size(size));
                     ui.add_space(4.0);
                 }
                 Component::Text { content, props } => {
@@ -111,25 +135,25 @@ impl RdxApp {
         }
     }
 
-    pub fn update_components(&mut self) {
-        self.scope.push("count", 0);
-        self.scope.set_or_push("message", "Hello, RDX!");
-
-        tracing::info!("evaluating RDX source {:?}", self.scope);
-
-        match self
-            .engine
-            .eval_with_scope::<Dynamic>(&mut self.scope, &self.rdx_source)
-        {
-            Ok(result) => {
-                // parse the result as string and set self.components if parse is ok
-                let s = result.to_string();
-                let res = parse(&s).unwrap();
-                self.components = res;
-            }
-            Err(e) => {
-                error!("Error updating components: {}", e);
-            }
-        }
-    }
+    // pub fn update_components(&mut self) {
+    //     self.scope.push("count", 0);
+    //     self.scope.set_or_push("message", "Hello, RDX!");
+    //
+    //     tracing::info!("evaluating RDX source {:?}", self.scope);
+    //
+    //     match self
+    //         .engine
+    //         .eval_with_scope::<Dynamic>(&mut self.scope, &self.rdx_source)
+    //     {
+    //         Ok(result) => {
+    //             // parse the result as string and set self.components if parse is ok
+    //             let s = result.to_string();
+    //             let res = parse(&s).unwrap();
+    //             self.components = res;
+    //         }
+    //         Err(e) => {
+    //             error!("Error updating components: {}", e);
+    //         }
+    //     }
+    // }
 }

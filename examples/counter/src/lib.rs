@@ -25,7 +25,7 @@ impl Guest for Counter {
             <Vertical>
                 <Button on_click=increment()>Increment</Button>
                 <Button on_click=decrement()>Decrement</Button>
-                <Label>Count is: {count}</Label>
+                <Label>Count is: {{count}}</Label>
             </Vertical>
         "#
         .to_string()

@@ -111,7 +111,8 @@ impl eframe::App for TemplateApp {
                 ui.vertical(|ui| {
                     if ui.button("Update").clicked() {
                         tracing::info!("Updating components");
-                        self.rdx.update_components();
+                        // self.rdx.update_components();
+                        ctx.request_repaint();
                     }
 
                     ui.add_space(20.0);
