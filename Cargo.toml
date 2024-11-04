@@ -32,15 +32,15 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
 
-# TODO: Feature gate this:
-wasmtime = { version = "25" }
-wasmtime-wasi = { version = "25" }
-wasi-common = { version = "25.0.1", features = ["tokio"] }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
-rhai = "1.19"
+rhai = { version = "1.19", features = ["sync"] }
+# TODO: Feature gate this & use jco for wasm-bindgen builds
+wasmtime = { version = "25" }
+wasmtime-wasi = { version = "25" }
+wasi-common = { version = "25.0.1", features = ["tokio"] }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]

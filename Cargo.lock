@@ -862,6 +862,9 @@ dependencies = [
 name = "counter"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
+ "wasmtime",
+ "wasmtime-wasi",
  "wit-bindgen-rt",
 ]
 
