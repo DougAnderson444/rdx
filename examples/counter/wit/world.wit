@@ -3,8 +3,9 @@ package component:plugin;
 interface types {
   /// The Event type.
   record event {
-    /// The count 
-    count: s32
+    /// The variable name
+    name: string,
+    value: string
   }
 }
 

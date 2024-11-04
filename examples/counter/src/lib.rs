@@ -25,7 +25,7 @@ impl Guest for Counter {
             <Vertical>
                 <Button on_click=increment()>Increment</Button>
                 <Button on_click=decrement()>Decrement</Button>
-                <Label>{count}</Label>
+                <Label>Count is: {count}</Label>
             </Vertical>
         "#
         .to_string()
@@ -44,14 +44,22 @@ impl provider::GuestCounter for Counter {
         // self.count + 1
         let mut count = self.count.borrow_mut();
         *count += 1;
-        emit(Event { count: *count });
+        emit(&Event {
+            name: "count".to_string(),
+            // convert the count into a String
+            value: (*count).to_string(),
+        });
         *count
     }
 
     fn decrement(&self) -> i32 {
         let mut count = self.count.borrow_mut();
         *count -= 1;
-        emit(Event { count: *count });
+        emit(&Event {
+            name: "count".to_string(),
+            value: (*count).to_string(),
+        });
+
         *count
     }
 }

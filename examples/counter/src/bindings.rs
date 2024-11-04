@@ -1,20 +1,26 @@
 pub type Event = component::plugin::types::Event;
 #[allow(unused_unsafe, clippy::all)]
 /// Import the event handler.
-pub fn emit(evt: Event) {
+pub fn emit(evt: &Event) {
     unsafe {
-        let component::plugin::types::Event { count: count0 } = evt;
+        let component::plugin::types::Event { name: name0, value: value0 } = evt;
+        let vec1 = name0;
+        let ptr1 = vec1.as_ptr().cast::<u8>();
+        let len1 = vec1.len();
+        let vec2 = value0;
+        let ptr2 = vec2.as_ptr().cast::<u8>();
+        let len2 = vec2.len();
         #[cfg(target_arch = "wasm32")]
         #[link(wasm_import_module = "$root")]
         extern "C" {
             #[link_name = "emit"]
-            fn wit_import(_: i32);
+            fn wit_import(_: *mut u8, _: usize, _: *mut u8, _: usize);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        fn wit_import(_: i32) {
+        fn wit_import(_: *mut u8, _: usize, _: *mut u8, _: usize) {
             unreachable!()
         }
-        wit_import(_rt::as_i32(count0));
+        wit_import(ptr1.cast_mut(), len1, ptr2.cast_mut(), len2);
     }
 }
 #[doc(hidden)]
@@ -65,19 +71,23 @@ pub mod component {
             #[used]
             #[doc(hidden)]
             static __FORCE_SECTION_REF: fn() = super::super::super::__link_custom_section_describing_imports;
+            use super::super::super::_rt;
             /// The Event type.
-            #[repr(C)]
-            #[derive(Clone, Copy)]
+            #[derive(Clone)]
             pub struct Event {
-                /// The count
-                pub count: i32,
+                /// The variable name
+                pub name: _rt::String,
+                pub value: _rt::String,
             }
             impl ::core::fmt::Debug for Event {
                 fn fmt(
                     &self,
                     f: &mut ::core::fmt::Formatter<'_>,
                 ) -> ::core::fmt::Result {
-                    f.debug_struct("Event").field("count", &self.count).finish()
+                    f.debug_struct("Event")
+                        .field("name", &self.name)
+                        .field("value", &self.value)
+                        .finish()
                 }
             }
         }
@@ -332,65 +342,7 @@ pub mod exports {
     }
 }
 mod _rt {
-    pub fn as_i32<T: AsI32>(t: T) -> i32 {
-        t.as_i32()
-    }
-    pub trait AsI32 {
-        fn as_i32(self) -> i32;
-    }
-    impl<'a, T: Copy + AsI32> AsI32 for &'a T {
-        fn as_i32(self) -> i32 {
-            (*self).as_i32()
-        }
-    }
-    impl AsI32 for i32 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for u32 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for i16 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for u16 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for i8 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for u8 {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for char {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
-    impl AsI32 for usize {
-        #[inline]
-        fn as_i32(self) -> i32 {
-            self as i32
-        }
-    }
+    pub use alloc_crate::string::String;
     #[cfg(target_arch = "wasm32")]
     pub fn run_ctors_once() {
         wit_bindgen_rt::run_ctors_once();
@@ -402,7 +354,6 @@ mod _rt {
         let layout = alloc::Layout::from_size_align_unchecked(size, align);
         alloc::dealloc(ptr, layout);
     }
-    pub use alloc_crate::string::String;
     use core::fmt;
     use core::marker;
     use core::sync::atomic::{AtomicU32, Ordering::Relaxed};
@@ -478,8 +429,67 @@ mod _rt {
         }
     }
     pub use alloc_crate::boxed::Box;
-    pub use alloc_crate::alloc;
+    pub fn as_i32<T: AsI32>(t: T) -> i32 {
+        t.as_i32()
+    }
+    pub trait AsI32 {
+        fn as_i32(self) -> i32;
+    }
+    impl<'a, T: Copy + AsI32> AsI32 for &'a T {
+        fn as_i32(self) -> i32 {
+            (*self).as_i32()
+        }
+    }
+    impl AsI32 for i32 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for u32 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for i16 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for u16 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for i8 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for u8 {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for char {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
+    impl AsI32 for usize {
+        #[inline]
+        fn as_i32(self) -> i32 {
+            self as i32
+        }
+    }
     extern crate alloc as alloc_crate;
+    pub use alloc_crate::alloc;
 }
 /// Generates `#[no_mangle]` functions to export the specified type as the
 /// root implementation of all generated traits.
@@ -515,17 +525,17 @@ pub(crate) use __export_plugin_world_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:plugin-world:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 428] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xa9\x02\x01A\x02\x01\
-A\x0a\x01B\x02\x01r\x01\x05countz\x04\0\x05event\x03\0\0\x03\x01\x16component:pl\
-ugin/types\x05\0\x02\x03\0\0\x05event\x03\0\x05event\x03\0\x01\x01@\x01\x03evt\x02\
-\x01\0\x03\0\x04emit\x01\x03\x01@\0\0s\x04\0\x04load\x01\x04\x01B\x08\x04\0\x07c\
-ounter\x03\x01\x01i\0\x01@\0\0\x01\x04\0\x14[constructor]counter\x01\x02\x01h\0\x01\
-@\x01\x04self\x03\0z\x04\0\x19[method]counter.increment\x01\x04\x04\0\x19[method\
-]counter.decrement\x01\x04\x04\x01\x19component:plugin/provider\x05\x05\x04\x01\x1d\
-component:plugin/plugin-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09\
-producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10wit-bindgen-rus\
-t\x060.30.0";
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 434] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xaf\x02\x01A\x02\x01\
+A\x0a\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\x01\x16com\
+ponent:plugin/types\x05\0\x02\x03\0\0\x05event\x03\0\x05event\x03\0\x01\x01@\x01\
+\x03evt\x02\x01\0\x03\0\x04emit\x01\x03\x01@\0\0s\x04\0\x04load\x01\x04\x01B\x08\
+\x04\0\x07counter\x03\x01\x01i\0\x01@\0\0\x01\x04\0\x14[constructor]counter\x01\x02\
+\x01h\0\x01@\x01\x04self\x03\0z\x04\0\x19[method]counter.increment\x01\x04\x04\0\
+\x19[method]counter.decrement\x01\x04\x04\x01\x19component:plugin/provider\x05\x05\
+\x04\x01\x1dcomponent:plugin/plugin-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\
+\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-component\x070.215.0\x10wit-\
+bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {
