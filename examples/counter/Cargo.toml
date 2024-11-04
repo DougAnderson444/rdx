@@ -8,6 +8,11 @@ edition = "2021"
 [dependencies]
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
 
+[dev-dependencies]
+wasmtime = { version = "25" }
+wasmtime-wasi = "25"
+thiserror = "1.0"
+
 [lib]
 crate-type = ["cdylib"]
 
