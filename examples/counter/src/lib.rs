@@ -1,21 +1,24 @@
 #[allow(warnings)]
 mod bindings;
 
-use std::cell::RefCell;
+use std::sync::LazyLock;
 
 use bindings::component::plugin::types::Event;
 use bindings::emit;
-use bindings::exports::component::plugin::provider;
 use bindings::Guest;
 
-pub struct Counter {
-    count: RefCell<i32>,
-}
+static COUNTER: LazyLock<Counter> = LazyLock::new(Counter::new);
 
 bindings::export!(Counter with_types_in bindings);
 
-impl provider::Guest for Counter {
-    type Counter = Self;
+struct Counter {
+    count: i32,
+}
+
+impl Counter {
+    fn new() -> Self {
+        Self { count: 0 }
+    }
 }
 
 impl Guest for Counter {
@@ -30,36 +33,28 @@ impl Guest for Counter {
         "#
         .to_string()
     }
-}
 
-impl provider::GuestCounter for Counter {
-    /// Create a new counter.
-    fn new() -> Self {
-        Counter {
-            count: RefCell::new(0),
-        }
-    }
+    /// Increment the count
+    fn increment() -> i32 {
+        let mut count = COUNTER.count;
+        count += 1;
 
-    fn increment(&self) -> i32 {
-        // self.count + 1
-        let mut count = self.count.borrow_mut();
-        *count += 1;
         emit(&Event {
             name: "count".to_string(),
-            // convert the count into a String
-            value: (*count).to_string(),
+            value: (count).to_string(),
         });
-        *count
+
+        count
     }
 
-    fn decrement(&self) -> i32 {
-        let mut count = self.count.borrow_mut();
-        *count -= 1;
-        emit(&Event {
-            name: "count".to_string(),
-            value: (*count).to_string(),
-        });
+    /// Decrement the count
+    fn decrement() -> i32 {
+        let mut count = COUNTER.count;
+        count -= 1;
+        count
+    }
 
-        *count
+    fn current() -> i32 {
+        COUNTER.count
     }
 }

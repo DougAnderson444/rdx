@@ -9,20 +9,6 @@ interface types {
   }
 }
 
-interface provider {
-
-  resource counter {
-    /// Constructs a new graph.
-    constructor();
-
-    /// Increments the counter.
-    increment: func() -> s32;
-
-    /// Decrements the counter.
-    decrement: func() -> s32;
-  }
-}
-
 /// An example world for the component to target.
 world plugin-world {
 
@@ -34,6 +20,12 @@ world plugin-world {
   /// Returns the RDX script.
   export load: func() -> string;
 
-  /// Export the provided component 
-  export provider;
+  /// Increments the counter.
+  export increment: func() -> s32;
+
+  /// Decrements the counter.
+  export decrement: func() -> s32;
+
+  /// Returns the current counter value. 
+  export current: func() -> s32;
 }
