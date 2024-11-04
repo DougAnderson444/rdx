@@ -78,6 +78,9 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                     Rule::string | Rule::inner_string => {
                         props.insert(name, value.as_str().to_string());
                     }
+                    // on_click=increment(1)
+                    // props on_click needs to be saved with the function name Increment
+                    // function increment, needs to be saved with the argument 1
                     Rule::functions => {
                         let mut func_inner = value.into_inner();
                         let func_name = func_inner.next().unwrap().as_str().to_string();
@@ -87,6 +90,7 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                                 _ => None,
                             })
                             .collect();
+                        props.insert(name, func_name.clone());
                         functions.insert(func_name, args);
                     }
                     _ => {

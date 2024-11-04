@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use bindgen::component::plugin::types::Event;
 use eframe::egui::{self};
-use wasmtime::component::{Component, Linker};
+use rhai::Dynamic;
+use wasmtime::component::{Component, Instance, Linker, Val};
 use wasmtime::{Config, Engine, Store};
 use wasmtime_wasi::{DirPerms, FilePerms, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
@@ -14,7 +15,13 @@ pub(crate) mod bindgen {
     wasmtime::component::bindgen!();
 }
 
-pub trait Inner {}
+pub trait Inner {
+    /// Update the state with the given key and value
+    fn update(&mut self, key: &str, value: impl Into<Dynamic>);
+
+    /// Sets the egui Context to given value
+    fn set_egui_ctx(&mut self, ctx: egui::Context);
+}
 
 /// Struct to hold the data we want to pass in
 /// plus the WASI properties in order to use WASI
@@ -25,10 +32,10 @@ pub struct MyCtx<T: Inner> {
     wasi_ctx: Context,
 }
 
-// plugins::MyCtx<T>: plugins::bindgen::PluginWorldImports
 impl<T: Inner> bindgen::PluginWorldImports for MyCtx<T> {
     fn emit(&mut self, evt: Event) {
-        todo!()
+        // update Rhai state,
+        self.inner.update(&evt.name, evt.value);
     }
 }
 
@@ -108,6 +115,8 @@ pub struct Plugin<T: Inner> {
     /// The built bindings for the wasm extensions
     pub instance: bindgen::PluginWorld,
 
+    pub raw_instance: Instance,
+
     /// The store to run the wasm extensions
     store: Store<MyCtx<T>>,
 }
@@ -155,7 +164,14 @@ impl<T: Inner + Send + Clone> Plugin<T> {
 
         let instance = bindgen::PluginWorld::instantiate(&mut store, &component, &env.linker)?;
 
-        Ok(Self { instance, store })
+        let raw_instance = env.linker.instantiate(&mut store, &component).unwrap();
+        // raw_instance.get_func(store, name)
+
+        Ok(Self {
+            instance,
+            store,
+            raw_instance,
+        })
     }
 
     /// Access to the inner state, the T in self.store: Store<MyCtx<T>>.
@@ -167,5 +183,32 @@ impl<T: Inner + Send + Clone> Plugin<T> {
     pub fn load_rdx(&mut self) -> Result<String, Error> {
         let rdx = self.instance.call_load(&mut self.store)?;
         Ok(rdx)
+    }
+
+    /// Loads the RDX from the component
+    pub fn call(&mut self, name: &str) -> Result<String, Error> {
+        // let rdx = self.instance.call_load(&mut self.store)?;
+        let func = self
+            .raw_instance
+            .get_func(&mut self.store, name)
+            .ok_or_else(|| Error::FuncNotFound(name.to_string()))?;
+
+        // type is ignore, but length is not
+        let mut rdx = [(Val::Bool(false))];
+
+        func.call(&mut self.store, &[], &mut rdx)?;
+
+        // post_return, so we can call it again (re-entry)
+        func.post_return(&mut self.store).unwrap();
+
+        match &rdx[0] {
+            Val::String(rdx) => Ok(rdx.to_owned()),
+            Val::S32(i) => Ok(i.to_string()),
+            _ => Err(Error::WrongReturnType("String".to_string())),
+        }
+    }
+    /// Sets the store.inner.egui_ctx to Some(ctx)
+    pub fn set_egui_ctx(&mut self, ctx: egui::Context) {
+        self.store.data_mut().inner.set_egui_ctx(ctx);
     }
 }

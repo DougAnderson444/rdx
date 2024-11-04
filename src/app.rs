@@ -34,10 +34,17 @@ impl TemplateApp {
         // Load previous app state (if any).
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
+            tracing::debug!("Loading previous app state");
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
 
-        Default::default()
+        tracing::debug!("Creating new app state");
+        Self {
+            // Example stuff:
+            label: "Hello World!".to_owned(),
+            value: 2.7,
+            rdx: RdxApp::new(cc.egui_ctx.clone()),
+        }
     }
 }
 
@@ -118,7 +125,8 @@ impl eframe::App for TemplateApp {
                     ui.add_space(20.0);
 
                     // Render the components
-                    self.rdx.render_component(ui, self.rdx.components());
+                    let all_components = self.rdx.components().clone();
+                    self.rdx.render_component(ui, &all_components);
                 });
             });
         });
