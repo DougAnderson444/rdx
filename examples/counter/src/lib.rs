@@ -2,24 +2,28 @@
 mod bindings;
 
 use std::sync::LazyLock;
+use std::sync::Mutex;
 
 use bindings::component::plugin::types::Event;
 use bindings::emit;
 use bindings::Guest;
 
-static COUNTER: LazyLock<Counter> = LazyLock::new(Counter::new);
+static COUNT: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0i32));
+// static COUNTER: LazyLock<Counter> = LazyLock::new(Counter::new);
 
 bindings::export!(Counter with_types_in bindings);
 
-struct Counter {
-    count: i32,
-}
+struct Counter;
 
-impl Counter {
-    fn new() -> Self {
-        Self { count: 0 }
-    }
-}
+// struct Counter {
+//     count: i32,
+// }
+
+// impl Counter {
+//     fn new() -> Self {
+//         Self { count: 0 }
+//     }
+// }
 
 impl Guest for Counter {
     /// Say hello!
@@ -36,25 +40,43 @@ impl Guest for Counter {
 
     /// Increment the count
     fn increment() -> i32 {
-        let mut count = COUNTER.count;
-        count += 1;
+        // let mut count = COUNTER.count;
+        // count += 1;
+        //
+        //
+        // count
+
+        let mut count = COUNT.lock().unwrap();
+        *count += 1;
 
         emit(&Event {
             name: "count".to_string(),
             value: (count).to_string(),
         });
 
-        count
+        *count
     }
 
     /// Decrement the count
     fn decrement() -> i32 {
-        let mut count = COUNTER.count;
-        count -= 1;
-        count
+        // let mut count = COUNTER.count;
+        // count -= 1;
+        // count
+
+        let mut count = COUNT.lock().unwrap();
+        *count -= 1;
+
+        emit(&Event {
+            name: "count".to_string(),
+            value: (count).to_string(),
+        });
+
+        *count
     }
 
     fn current() -> i32 {
-        COUNTER.count
+        // COUNTER.count
+
+        *COUNT.lock().unwrap()
     }
 }

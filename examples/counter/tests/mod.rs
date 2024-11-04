@@ -86,7 +86,7 @@ mod test_mod_echo {
 
     use super::*;
 
-    use wasmtime::component::Val;
+    use wasmtime::{component::Val, AsContextMut};
     use wasmtime_wasi::{DirPerms, FilePerms};
 
     const HOST_PATH: &str = "./tests/exts";
@@ -137,26 +137,60 @@ mod test_mod_echo {
         let c = bindings.call_increment(&mut store).unwrap();
 
         assert_eq!(c, 1);
+        // again
 
-        let instance = linker.instantiate(&mut store, &component).unwrap();
+        let c_2 = bindings.call_increment(&mut store).unwrap();
 
-        // should be able to get_func "increment" behind the exported interface provider and call
-        // it.
-        let name = "increment";
-        let export_index = instance.get_export(&mut store, None, name).unwrap();
-        let func = instance.get_func(&mut store, export_index).unwrap();
-
-        let mut results = vec![Val::S32(0)];
-
-        func.call(&mut store, &[], &mut results).unwrap();
-
-        // count in MyCtx shoudl match returned count, yes?
+        // store should have been updated too
         let state = store.data().count;
-        // different instances updated the same state
         assert_eq!(state, 2);
 
-        // this instance's state should be 1
-        assert_eq!(results[0], Val::S32(1));
+        assert_eq!(c_2, 2);
+
+        // should be able to get_func "increment" behind the exported interface provider and call it.
+        let name = "increment";
+
+        let instance = linker
+            .instantiate(store.as_context_mut(), &component)
+            .unwrap();
+
+        /**/
+        let export_index = instance.get_export(&mut store, None, name).unwrap();
+
+        let increment = *instance
+            .get_typed_func::<(), (i32,)>(&mut store, &export_index)?
+            .func();
+        let callee =
+            unsafe { wasmtime::component::TypedFunc::<(), (i32,)>::new_unchecked(increment) };
+        let (ret0,) = callee.call(store.as_context_mut(), ())?;
+        callee.post_return(store.as_context_mut())?;
+
+        assert_eq!(ret0, 1);
+
+        let (ret1,) = callee.call(store.as_context_mut(), ())?;
+        callee.post_return(store.as_context_mut())?;
+
+        assert_eq!(ret1, 2);
+        /**/
+
+        // let current = store.data().count;
+
+        let func = instance.get_func(&mut store, name).unwrap();
+        let mut results = vec![Val::S32(0)];
+        func.call(&mut store, &[], &mut results).unwrap();
+
+        assert_eq!(results[0], Val::S32(3));
+
+        // post_return, so we can call it again
+        func.post_return(&mut store).unwrap();
+
+        let mut results = vec![Val::S32(0)];
+        func.call(&mut store, &[], &mut results).unwrap();
+
+        // post_return, so we can call it again
+        func.post_return(&mut store).unwrap();
+
+        assert_eq!(results[0], Val::S32(4));
 
         Ok(())
     }
