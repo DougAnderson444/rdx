@@ -219,15 +219,17 @@ impl<T: Inner + Send + Clone> Plugin<T> {
             .get_func(&mut self.store, name)
             .ok_or_else(|| Error::FuncNotFound(name.to_string()))?;
 
-        // type is ignore, but length is not
-        let mut rdx = [(Val::Bool(false))];
+        // type is ignored, but length is not
+        let capacity = 1;
+        // let mut results = vec![(Val::Bool(false))];
+        let mut results = vec![Val::Bool(false); capacity];
 
-        func.call(&mut self.store, &[], &mut rdx)?;
+        func.call(&mut self.store, &[], &mut results)?;
 
         // post_return, so we can call it again (re-entry)
         func.post_return(&mut self.store).unwrap();
 
-        match &rdx[0] {
+        match &results[0] {
             Val::String(rdx) => Ok(rdx.to_owned()),
             Val::S32(i) => Ok(i.to_string()),
             val => Err(Error::WrongReturnType(format!("{:?}", val))),
