@@ -41,6 +41,8 @@ rhai = { version = "1.19", features = ["sync"] }
 wasmtime = { version = "25" }
 wasmtime-wasi = { version = "25" }
 wasi-common = { version = "25.0.1", features = ["tokio"] }
+wasm-compose = "0.219.1"
+wasmparser = "0.219.1"
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]

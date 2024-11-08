@@ -1,13 +1,11 @@
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::pest::{parse, Component};
 use crate::plugins::{Environment, Inner, Plugin};
-use crate::template::TemplatePart;
 use crate::utils;
 
 use rhai::{Dynamic, Engine, Scope};
-use tracing::{debug, error};
+use tracing::error;
 
 #[derive(Debug, Clone)]
 struct State<'a> {
@@ -133,6 +131,8 @@ impl RdxApp {
                     if ui.add(egui::Button::new(&text).fill(color)).clicked() {
                         tracing::debug!("Button clicked");
                         if let Some(on_click) = props.get("on_click") {
+                            // if we had to call Rhai to execute the function:
+                            //
                             // self.engine
                             //     .eval_with_scope::<Dynamic>(
                             //         &mut self.scope.lock().unwrap(),
