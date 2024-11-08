@@ -1,3 +1,11 @@
+//! Plugins Module based only on imports (emit for now) and a single export (load).
+//!
+//! Components will export further functions, but these are dynamically called by name
+//! and thus cannot be known ahead of time and thus are absent from the wit.world for
+//! this module, but will be present in the wasm code, thus can be called as long
+//! as the name matches.
+
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -5,6 +13,7 @@ use std::sync::Arc;
 use bindgen::component::plugin::types::Event;
 use eframe::egui::{self};
 use rhai::Dynamic;
+use wasmparser::ComponentExternalKind;
 use wasmtime::component::{Component, Instance, Linker, Val};
 use wasmtime::{Config, Engine, Store};
 use wasmtime_wasi::{DirPerms, FilePerms, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
@@ -12,7 +21,7 @@ use wasmtime_wasi::{DirPerms, FilePerms, ResourceTable, WasiCtx, WasiCtxBuilder,
 use crate::error::Error;
 
 pub(crate) mod bindgen {
-    wasmtime::component::bindgen!();
+    wasmtime::component::bindgen!("plugin-world" in "wit/imp.wit");
 }
 
 pub trait Inner {
@@ -119,6 +128,9 @@ pub struct Plugin<T: Inner> {
 
     /// The store to run the wasm extensions
     store: Store<MyCtx<T>>,
+
+    /// Names of the Exported functions from the wasm component, so they can be registered in Rhai
+    exports: HashSet<String>,
 }
 
 impl<T: Inner + Send + Clone> Plugin<T> {
@@ -129,6 +141,19 @@ impl<T: Inner + Send + Clone> Plugin<T> {
         wasm_bytes: &[u8],
         state: T,
     ) -> Result<Self, Error> {
+        // Get exports so we can register them in Rhai.
+        let comp = wasm_compose::graph::Component::from_bytes(name, wasm_bytes)?;
+        let exports: HashSet<String> = comp
+            .exports()
+            .filter_map(|(_idx, name, kind, _)| {
+                if kind == ComponentExternalKind::Func {
+                    Some(name.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         let component = Component::from_binary(&env.engine, wasm_bytes)?;
 
         // ensure the HOST PATH / name exists, if not, create it
@@ -171,6 +196,7 @@ impl<T: Inner + Send + Clone> Plugin<T> {
             instance,
             store,
             raw_instance,
+            exports,
         })
     }
 
@@ -181,11 +207,11 @@ impl<T: Inner + Send + Clone> Plugin<T> {
 
     /// Loads the RDX from the component
     pub fn load_rdx(&mut self) -> Result<String, Error> {
-        let rdx = self.instance.call_load(&mut self.store)?;
+        let rdx = self.call("load")?;
         Ok(rdx)
     }
 
-    /// Loads the RDX from the component
+    /// Loads the RDX from the component. Can only take 1 parameter.
     pub fn call(&mut self, name: &str) -> Result<String, Error> {
         // let rdx = self.instance.call_load(&mut self.store)?;
         let func = self
@@ -204,11 +230,68 @@ impl<T: Inner + Send + Clone> Plugin<T> {
         match &rdx[0] {
             Val::String(rdx) => Ok(rdx.to_owned()),
             Val::S32(i) => Ok(i.to_string()),
-            _ => Err(Error::WrongReturnType("String".to_string())),
+            val => Err(Error::WrongReturnType(format!("{:?}", val))),
         }
     }
     /// Sets the store.inner.egui_ctx to Some(ctx)
     pub fn set_egui_ctx(&mut self, ctx: egui::Context) {
         self.store.data_mut().inner.set_egui_ctx(ctx);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[derive(Default, Clone)]
+    struct TestInner {
+        data: HashMap<String, Dynamic>,
+        egui_ctx: Option<egui::Context>,
+    }
+
+    impl Inner for TestInner {
+        fn update(&mut self, key: &str, value: impl Into<Dynamic>) {
+            self.data.insert(key.to_string(), value.into());
+        }
+
+        fn set_egui_ctx(&mut self, ctx: egui::Context) {
+            self.egui_ctx = Some(ctx);
+        }
+    }
+
+    #[test]
+    fn test_plugin() {
+        let mut inner = TestInner::default();
+        let test_path = PathBuf::from("./test_path");
+        let env: Environment<TestInner> = Environment::new(test_path.clone()).unwrap();
+
+        let name = "counter";
+        let wasm_path = crate::utils::get_wasm_path(name).unwrap();
+        let wasm_bytes = std::fs::read(wasm_path.clone()).unwrap();
+        let mut plugin = Plugin::new(env.clone(), name, &wasm_bytes, TestInner::default()).unwrap();
+        assert_eq!(plugin.state().data.len(), 0);
+
+        // should be able to call exports; increment, decrement
+        let count = plugin.call("increment").unwrap();
+        assert_eq!(count, "1");
+
+        // call current, should be 1
+        let current_count = plugin.call("current").unwrap();
+        assert_eq!(current_count, "1");
+        assert_eq!(current_count, count);
+
+        let another_count = plugin.call("decrement").unwrap();
+        assert_eq!(another_count, "0");
+
+        // rm test_path
+        std::fs::remove_dir_all(test_path).unwrap();
+
+        // Plugin exports should contain increment, decrement, current, load
+        assert_eq!(plugin.exports.len(), 4);
+        assert!(plugin.exports.contains("increment"));
+        assert!(plugin.exports.contains("decrement"));
+        assert!(plugin.exports.contains("current"));
+        assert!(plugin.exports.contains("load"));
     }
 }
