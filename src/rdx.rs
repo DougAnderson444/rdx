@@ -60,8 +60,13 @@ impl RdxApp {
         scope.lock().unwrap().set_or_push("count", 0);
 
         let name = "counter";
+        #[cfg(debug_assertions)]
         let wasm_bytes =
             include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm").to_vec();
+        // ../assets if not in debug mode
+        #[cfg(not(debug_assertions))]
+        let wasm_bytes = include_bytes!("../assets/counter.wasm").to_vec();
+
         let mut plugin = LayerPlugin::new(&wasm_bytes, State::new(ctx.clone(), scope.clone()));
         let rdx_source = plugin.call("load", &[]).unwrap();
 
