@@ -127,6 +127,17 @@ jobs:
     steps:
     - name: Building ${{ matrix.TARGET }}
       run: echo "${{ matrix.TARGET }}"
+     
+    # Use Just commands
+    - uses: extractions/setup-just@v2
+
+    # binstall is faster than cargo install
+    - name: Install binstall
+      uses: taiki-e/install-action@cargo-binstall
+      
+    # We'l need cargo-component to build WIT Components in the Just commands
+    - name: Install cargo-component
+      run: echo yes | cargo binstall cargo-component
 
     - uses: actions/checkout@master
     - name: Install build dependencies - Rustup
@@ -146,8 +157,9 @@ jobs:
       run: |
         cargo install cross
 
-    - name: Build
+    - name: Build (Just + Cross)
       run: |
+        just build
         cross build --verbose --release --target=${{ matrix.TARGET }}
 
     - name: Rename
