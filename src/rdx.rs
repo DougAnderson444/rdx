@@ -135,7 +135,7 @@ impl RdxApp {
                             tracing::debug!("On click {:?}", on_click);
                             let func_args = functions.get(on_click).unwrap();
                             tracing::debug!("Func args {:?}", func_args);
-                            match self.plugins.get_mut("count").unwrap().call(on_click, &[]) {
+                            match self.plugins.get_mut("counter").unwrap().call(on_click, &[]) {
                                 Ok(res) => {
                                     tracing::info!("on_click response {:?}", res);
                                 }

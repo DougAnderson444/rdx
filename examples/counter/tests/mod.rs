@@ -86,7 +86,7 @@ mod test_mod_echo {
 
     use super::*;
 
-    use wasmtime::{component::Val, AsContextMut};
+    use wasmtime::AsContextMut;
     use wasmtime_wasi::{DirPerms, FilePerms};
 
     const HOST_PATH: &str = "./tests/exts";
@@ -97,7 +97,7 @@ mod test_mod_echo {
         // get the target/wasm32-wasi/debug/CARGO_PKG_NAME.wasm file
         let pkg_name = std::env::var("CARGO_PKG_NAME")?.replace('-', "_");
         let workspace = workspace_dir();
-        let wasm_path = format!("target/wasm32-wasip1/debug/{}.wasm", pkg_name);
+        let wasm_path = format!("target/wasm32-unknown-unknown/debug/{}.wasm", pkg_name);
         let wasm_path = workspace.join(wasm_path);
 
         let mut config = Config::new();
@@ -161,7 +161,13 @@ mod test_mod_echo {
             .unwrap();
 
         /**/
-        let export_index = instance.get_export(&mut store, None, name).unwrap();
+        let export_index = instance
+            .get_export(&mut store, None, "component:plugin/run")
+            .unwrap();
+
+        let export_index = instance
+            .get_export(&mut store, Some(&export_index), name)
+            .unwrap();
 
         let increment = *instance
             .get_typed_func::<(), (i32,)>(&mut store, &export_index)?
@@ -177,26 +183,27 @@ mod test_mod_echo {
         callee.post_return(store.as_context_mut())?;
 
         assert_eq!(ret1, 2);
-        /**/
 
         // let current = store.data().count;
 
-        let func = instance.get_func(&mut store, name).unwrap();
-        let mut results = vec![Val::S32(0)];
-        func.call(&mut store, &[], &mut results).unwrap();
+        // For direct (no interace exports):
 
-        assert_eq!(results[0], Val::S32(3));
-
-        // post_return, so we can call it again
-        func.post_return(&mut store).unwrap();
-
-        let mut results = vec![Val::S32(0)];
-        func.call(&mut store, &[], &mut results).unwrap();
-
-        // post_return, so we can call it again
-        func.post_return(&mut store).unwrap();
-
-        assert_eq!(results[0], Val::S32(4));
+        // let func = instance.get_func(&mut store, name).unwrap();
+        // let mut results = vec![Val::S32(0)];
+        // func.call(&mut store, &[], &mut results).unwrap();
+        //
+        // assert_eq!(results[0], Val::S32(3));
+        //
+        // // post_return, so we can call it again
+        // func.post_return(&mut store).unwrap();
+        //
+        // let mut results = vec![Val::S32(0)];
+        // func.call(&mut store, &[], &mut results).unwrap();
+        //
+        // // post_return, so we can call it again
+        // func.post_return(&mut store).unwrap();
+        //
+        // assert_eq!(results[0], Val::S32(4));
 
         Ok(())
     }

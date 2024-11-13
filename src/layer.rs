@@ -235,7 +235,8 @@ mod tests {
         // check the store data
         let data = store.data();
         let count = &data.count;
-        let count_i64 = count.as_int().unwrap();
+        let count_string = count.to_string();
+        let count_i64 = count_string.parse::<i64>().unwrap();
         assert_eq!(count_i64, 1);
     }
 

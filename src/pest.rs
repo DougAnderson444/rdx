@@ -367,7 +367,9 @@ mod tests {
                 children: vec![
                     Component::Button {
                         content: Some("Increment".to_string()),
-                        props: Default::default(),
+                        props: vec![("on_click".to_string(), "increment".to_string())]
+                            .into_iter()
+                            .collect(),
                         functions: vec![("increment".to_string(), vec![])]
                             .into_iter()
                             .collect(),
