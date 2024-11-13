@@ -33,7 +33,7 @@ impl WasiView for MyCtx {
 
 impl bindgen::component::plugin::types::Host for MyCtx {}
 
-impl bindgen::PluginWorldImports for MyCtx {
+impl bindgen::component::plugin::host::Host for MyCtx {
     fn emit(&mut self, _evt: Event) {
         // update Rhai state,
         self.count += 1;
@@ -134,12 +134,18 @@ mod test_mod_echo {
 
         let bindings = bindgen::PluginWorld::instantiate(&mut store, &component, &linker)?;
 
-        let c = bindings.call_increment(&mut store).unwrap();
+        let c = bindings
+            .component_plugin_run()
+            .call_increment(&mut store)
+            .unwrap();
 
         assert_eq!(c, 1);
         // again
 
-        let c_2 = bindings.call_increment(&mut store).unwrap();
+        let c_2 = bindings
+            .component_plugin_run()
+            .call_increment(&mut store)
+            .unwrap();
 
         // store should have been updated too
         let state = store.data().count;

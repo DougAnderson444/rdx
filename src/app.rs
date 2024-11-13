@@ -80,6 +80,8 @@ impl eframe::App for TemplateApp {
         // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
         // For inspiration and more examples, go to https://emilk.github.io/egui
 
+        // set egui_ctx for the rdx app
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             // The top panel is often a good place for a menu bar:
 
@@ -145,41 +147,5 @@ impl eframe::App for TemplateApp {
             let all_components = self.rdx.components().clone();
             self.rdx.render_component(ui, &all_components);
         });
-
-        // egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-        //     // Left panel with the RDX source code
-        //     ui.horizontal(|ui| {
-        //         ui.add(
-        //             egui::TextEdit::multiline(&mut self.rdx.source())
-        //                 .desired_width(ui.available_width() * 0.5)
-        //                 .desired_rows(30)
-        //                 .font(egui::TextStyle::Monospace),
-        //         );
-        //
-        //         ui.vertical(|ui| {
-        //             if ui.button("Update").clicked() {
-        //                 tracing::info!("Updating components");
-        //                 // self.rdx.update_components();
-        //                 ctx.request_repaint();
-        //             }
-        //
-        //             ui.add_space(20.0);
-        //         });
-        //     });
-        // });
     }
-}
-
-fn powered_by_egui_and_eframe(ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label("Powered by ");
-        ui.hyperlink_to("egui", "https://github.com/emilk/egui");
-        ui.label(" and ");
-        ui.hyperlink_to(
-            "eframe",
-            "https://github.com/emilk/egui/tree/master/crates/eframe",
-        );
-        ui.label(".");
-    });
 }

@@ -1,11 +1,10 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
-// use crate::plugins::{Environment, Plugin};
-use crate::utils;
 
-use rhai::{Dynamic, Engine, Scope};
+use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
 
@@ -37,19 +36,13 @@ impl Inner for State<'_> {
             tracing::warn!("Egui context is not set");
         }
     }
-
-    fn set_egui_ctx(&mut self, ctx: egui::Context) {
-        self.egui_ctx = Some(ctx);
-    }
 }
 
 pub struct RdxApp {
-    engine: Engine,
     scope: Arc<Mutex<Scope<'static>>>,
     components: Vec<Component>,
     rdx_source: String,
-    egui_ctx: egui::Context,
-    plugins: Vec<LayerPlugin<State<'static>>>,
+    plugins: HashMap<String, LayerPlugin<State<'static>>>,
 }
 
 impl Default for RdxApp {
@@ -61,8 +54,6 @@ impl Default for RdxApp {
 
 impl RdxApp {
     pub fn new(ctx: egui::Context) -> Self {
-        let engine = Engine::new();
-
         let scope = Arc::new(Mutex::new(Scope::new()));
 
         // set scope count var to 0
@@ -71,8 +62,7 @@ impl RdxApp {
         let name = "counter";
         let wasm_bytes =
             include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm").to_vec();
-        let mut plugin =
-            LayerPlugin::new(name, &wasm_bytes, State::new(ctx.clone(), scope.clone()));
+        let mut plugin = LayerPlugin::new(&wasm_bytes, State::new(ctx.clone(), scope.clone()));
         let rdx_source = plugin.call("load", &[]).unwrap();
 
         tracing::info!("RDX Source {:?}", rdx_source);
@@ -85,13 +75,14 @@ impl RdxApp {
 
         tracing::info!("Components {:?}", components);
 
+        let mut plugins = HashMap::new();
+        plugins.insert(name.to_string(), plugin);
+
         Self {
-            engine,
             scope,
             components,
             rdx_source: rdx_source.to_string(),
-            egui_ctx: ctx,
-            plugins: vec![plugin],
+            plugins,
         }
     }
 }
@@ -144,7 +135,7 @@ impl RdxApp {
                             tracing::debug!("On click {:?}", on_click);
                             let func_args = functions.get(on_click).unwrap();
                             tracing::debug!("Func args {:?}", func_args);
-                            match self.plugins[0].call(on_click, &[]) {
+                            match self.plugins.get_mut("count").unwrap().call(on_click, &[]) {
                                 Ok(res) => {
                                     tracing::info!("on_click response {:?}", res);
                                 }

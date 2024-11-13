@@ -21,6 +21,8 @@ build-examples:
    fi \
   done
 
+build: build-couter build-wits build-examples
+
 test: build-couter
   cargo test
 
@@ -29,3 +31,7 @@ run: build-couter
 
 web-dev: build-couter
   trunk serve --open
+
+check: build
+  ./check.sh
+

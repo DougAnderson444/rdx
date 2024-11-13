@@ -209,14 +209,14 @@ mod tests {
 
     use super::*;
 
-    fn init_logger() {
-        let subscriber = tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .finish();
-        if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-            tracing::warn!("failed to set subscriber: {}", e);
-        }
-    }
+    // fn init_logger() {
+    //     let subscriber = tracing_subscriber::fmt()
+    //         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+    //         .finish();
+    //     if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+    //         tracing::warn!("failed to set subscriber: {}", e);
+    //     }
+    // }
 
     #[test]
     fn test_parse_and_generate() {
