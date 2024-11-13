@@ -57,6 +57,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -84,6 +85,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
       
       - uses: actions-rs/toolchain@v1
         with:
@@ -112,6 +114,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -140,6 +143,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
       
       - uses: actions-rs/toolchain@v1
         with:
@@ -168,6 +172,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -196,6 +201,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
+          path: target/wasm32-unknown-unknown
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -249,6 +255,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: wasm-files-target
+        path: target/wasm32-unknown-unknown
 
     - name: Building ${{ matrix.TARGET }}
       run: echo "${{ matrix.TARGET }}"
