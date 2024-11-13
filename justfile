@@ -23,13 +23,13 @@ build-examples:
 
 build: build-counter build-wits build-examples
 
-test: build-counter
+test: build
   cargo test
 
-run: build-couter
+run: build
   cargo run
 
-web-dev: build-couter
+web-dev: build
   trunk serve --open
 
 check: build
