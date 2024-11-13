@@ -1,4 +1,4 @@
-build-couter:
+build-counter:
   @echo "Building example counter"
   cargo component build --manifest-path examples/counter/Cargo.toml --target wasm32-unknown-unknown
   # cargo component build --manifest-path examples/counter/Cargo.toml --release
@@ -21,9 +21,9 @@ build-examples:
    fi \
   done
 
-build: build-couter build-wits build-examples
+build: build-counter build-wits build-examples
 
-test: build-couter
+test: build-counter
   cargo test
 
 run: build-couter
