@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use rhai::Dynamic;
 
 /// Holds the template parts (Static and Dynamic).
@@ -92,7 +90,7 @@ impl Template {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr as _;
+    use std::{collections::HashMap, str::FromStr as _};
 
     use super::*;
 

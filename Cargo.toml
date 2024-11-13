@@ -31,7 +31,8 @@ pest_derive = "2.7.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
-
+wasm_component_layer = "0.1.18"
+wasm_runtime_layer = "0.4"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -43,6 +44,7 @@ wasmtime-wasi = { version = "25" }
 wasi-common = { version = "25.0.1", features = ["tokio"] }
 wasm-compose = "0.219.1"
 wasmparser = "0.219.1"
+wasmtime_runtime_layer = "26.0.0"
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -50,6 +52,8 @@ wasm-bindgen-futures = "0.4"
 web-sys = "0.3.70"                                       # to access the DOM (to hide the loading text)
 getrandom = { version = "0.2", features = ["js"] }       # For web builds
 rhai = { version = "1.19", features = ["wasm-bindgen"] }
+js_wasm_runtime_layer = "0.4.0"
+anyhow = "1.0"
 
 [profile.release]
 opt-level = 2 # fast and small wasm

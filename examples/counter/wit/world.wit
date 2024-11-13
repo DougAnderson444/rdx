@@ -9,23 +9,36 @@ interface types {
   }
 }
 
+interface host {
+  use types.{event};
+
+  /// emit an event.
+  emit: func(evt: event);
+}
+
+interface run {
+
+  /// Returns the RDX script.
+  load: func() -> string;
+
+  /// Increments the counter.
+  increment: func() -> s32;
+
+  /// Decrements the counter.
+  decrement: func() -> s32;
+
+  /// Returns the current counter value.
+  current: func() -> s32;
+}
+
 /// An example world for the component to target.
 world plugin-world {
 
   use types.{event};
 
   /// Import the event handler.
-  import emit: func(evt: event);
+  import host;
+
+  export run;
   
-  /// Returns the RDX script.
-  export load: func() -> string;
-
-  /// Increments the counter.
-  export increment: func() -> s32;
-
-  /// Decrements the counter.
-  export decrement: func() -> s32;
-
-  /// Returns the current counter value. 
-  export current: func() -> s32;
 }

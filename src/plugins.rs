@@ -5,6 +5,8 @@
 //! this module, but will be present in the wasm code, thus can be called as long
 //! as the name matches.
 
+use crate::layer::{runtime_layer, Inner};
+
 use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -12,25 +14,12 @@ use std::sync::Arc;
 
 use bindgen::component::plugin::types::Event;
 use eframe::egui::{self};
-use rhai::Dynamic;
-use wasmparser::ComponentExternalKind;
-use wasmtime::component::{Component, Instance, Linker, Val};
-use wasmtime::{Config, Engine, Store};
+use wasm_component_layer::Value;
+use wasmtime::component::{Linker, Val};
+use wasmtime::{Config, Engine};
 use wasmtime_wasi::{DirPerms, FilePerms, ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::error::Error;
-
-pub(crate) mod bindgen {
-    wasmtime::component::bindgen!("plugin-world" in "wit/imp.wit");
-}
-
-pub trait Inner {
-    /// Update the state with the given key and value
-    fn update(&mut self, key: &str, value: impl Into<Dynamic>);
-
-    /// Sets the egui Context to given value
-    fn set_egui_ctx(&mut self, ctx: egui::Context);
-}
 
 /// Struct to hold the data we want to pass in
 /// plus the WASI properties in order to use WASI
@@ -121,19 +110,16 @@ impl<T: Inner + Send + Clone> Environment<T> {
 
 /// Extension struct to hold the wasm extension files
 pub struct Plugin<T: Inner> {
-    /// The built bindings for the wasm extensions
-    pub instance: bindgen::PluginWorld,
-
-    pub raw_instance: Instance,
+    pub raw_instance: wasm_component_layer::Instance,
 
     /// The store to run the wasm extensions
-    store: Store<MyCtx<T>>,
+    store: wasm_component_layer::Store<T, runtime_layer::Engine>,
 
     /// Names of the Exported functions from the wasm component, so they can be registered in Rhai
     exports: HashSet<String>,
 }
 
-impl<T: Inner + Send + Clone> Plugin<T> {
+impl<T: crate::layer::Inner + Send + Clone> Plugin<T> {
     /// Creates and instantiates a new [Plugin]
     pub fn new(
         env: Environment<T>,
@@ -141,68 +127,25 @@ impl<T: Inner + Send + Clone> Plugin<T> {
         wasm_bytes: &[u8],
         state: T,
     ) -> Result<Self, Error> {
-        // Get exports so we can register them in Rhai.
-        let comp = wasm_compose::graph::Component::from_bytes(name, wasm_bytes)?;
-        let exports: HashSet<String> = comp
+        let (raw_instance, store) = crate::layer::instantiate_instance(wasm_bytes, state);
+
+        let exports = raw_instance
             .exports()
-            .filter_map(|(_idx, name, kind, _)| {
-                if kind == ComponentExternalKind::Func {
-                    Some(name.to_string())
-                } else {
-                    None
-                }
-            })
-            .collect();
+            .instance(&"component:plugin/run".try_into()?)
+            .unwrap();
 
-        let component = Component::from_binary(&env.engine, wasm_bytes)?;
-
-        // ensure the HOST PATH / name exists, if not, create it
-        let host_plugin_path_name = env.host_path.join(name);
-        // tracing::info!("Creating host plugin path: {:?}", host_plugin_path_name);
-        std::fs::create_dir_all(&host_plugin_path_name)?;
-
-        let wasi = WasiCtxBuilder::new()
-            .inherit_stdio()
-            .inherit_stdout()
-            .envs(&env.vars.unwrap_or_default())
-            .preopened_dir(
-                &host_plugin_path_name,
-                ".",
-                DirPerms::all(),
-                FilePerms::all(),
-            )?
-            .build();
-
-        let data = MyCtx {
-            inner: state,
-            wasi_ctx: Context {
-                table: ResourceTable::new(),
-                wasi,
-            },
-        };
-        let mut store = Store::new(&env.engine, data);
-
-        // get a &mut linker by deref muting it
-        // let lnkr = &mut *env.linker.clone();
-        // let lnkr = &mut (*env.linker).clone();
-        // bindgen::ExtensionWorld::add_to_linker(lnkr, |state: &mut MyCtx<T>| state)?;
-
-        let instance = bindgen::PluginWorld::instantiate(&mut store, &component, &env.linker)?;
-
-        let raw_instance = env.linker.instantiate(&mut store, &component).unwrap();
-        // raw_instance.get_func(store, name)
+        let exports = exports.funcs().map(|f| f.0.to_string()).collect();
 
         Ok(Self {
-            instance,
-            store,
             raw_instance,
+            store,
             exports,
         })
     }
 
     /// Access to the inner state, the T in self.store: Store<MyCtx<T>>.
     pub fn state(&self) -> &T {
-        &self.store.data().inner
+        &self.store.data()
     }
 
     /// Loads the RDX from the component
@@ -214,36 +157,51 @@ impl<T: Inner + Send + Clone> Plugin<T> {
     /// Loads the RDX from the component. Can only take 1 parameter.
     pub fn call(&mut self, name: &str) -> Result<String, Error> {
         // let rdx = self.instance.call_load(&mut self.store)?;
-        let func = self
+        let export_instance = self
             .raw_instance
-            .get_func(&mut self.store, name)
+            .exports()
+            .instance(&"component:plugin/run".try_into()?)
+            .ok_or(Error::InstanceNotFound)?;
+
+        let func = export_instance
+            .func(name)
             .ok_or_else(|| Error::FuncNotFound(name.to_string()))?;
 
         // type is ignored, but length is not
-        let capacity = 1;
+        const CAPACITY: usize = 1;
+        let arguments = &[];
         // let mut results = vec![(Val::Bool(false))];
-        let mut results = vec![Val::Bool(false); capacity];
+        let mut results = [Value::Bool(false); CAPACITY];
+        //
+        // export_instance.call(&mut self.store, &[], &mut results)?;
+        //
+        // // post_return, so we can call it again (re-entry)
+        // export_instance.post_return(&mut self.store).unwrap();
+        //
+        // match &results[0] {
+        //     Val::String(rdx) => Ok(rdx.to_owned()),
+        //     Val::S32(i) => Ok(i.to_string()),
+        //     val => Err(Error::WrongReturnType(format!("{:?}", val))),
+        // }
 
-        func.call(&mut self.store, &[], &mut results)?;
-
-        // post_return, so we can call it again (re-entry)
-        func.post_return(&mut self.store).unwrap();
+        func.call(&mut self.store, arguments, &mut results)?;
 
         match &results[0] {
-            Val::String(rdx) => Ok(rdx.to_owned()),
+            Value::String(rdx) => Ok(rdx.to_owned()),
             Val::S32(i) => Ok(i.to_string()),
             val => Err(Error::WrongReturnType(format!("{:?}", val))),
         }
     }
     /// Sets the store.inner.egui_ctx to Some(ctx)
     pub fn set_egui_ctx(&mut self, ctx: egui::Context) {
-        self.store.data_mut().inner.set_egui_ctx(ctx);
+        self.store.data_mut().set_egui_ctx(ctx);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rhai::Dynamic;
     use std::collections::HashMap;
 
     #[derive(Default, Clone)]
@@ -253,7 +211,7 @@ mod tests {
     }
 
     impl Inner for TestInner {
-        fn update(&mut self, key: &str, value: impl Into<Dynamic>) {
+        fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic>) {
             self.data.insert(key.to_string(), value.into());
         }
 

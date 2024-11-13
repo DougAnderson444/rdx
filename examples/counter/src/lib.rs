@@ -4,9 +4,9 @@ mod bindings;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
+use bindings::component::plugin::host::emit;
 use bindings::component::plugin::types::Event;
-use bindings::emit;
-use bindings::Guest;
+use bindings::exports::component::plugin::run::Guest;
 
 static COUNT: LazyLock<Mutex<i32>> = LazyLock::new(|| Mutex::new(0i32));
 // static COUNTER: LazyLock<Counter> = LazyLock::new(Counter::new);

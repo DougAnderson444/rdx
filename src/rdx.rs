@@ -1,11 +1,13 @@
 use std::sync::{Arc, Mutex};
 
+use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
-use crate::plugins::{Environment, Inner, Plugin};
+// use crate::plugins::{Environment, Plugin};
 use crate::utils;
 
 use rhai::{Dynamic, Engine, Scope};
 use tracing::error;
+use wasm_component_layer::Value;
 
 #[derive(Debug, Clone)]
 struct State<'a> {
@@ -24,11 +26,15 @@ impl<'a> State<'a> {
 
 impl Inner for State<'_> {
     /// Updates the scope variable to the given value
-    fn update(&mut self, key: &str, value: impl Into<Dynamic>) {
+    fn update(&mut self, key: &str, value: impl Into<Dynamic> + Copy) {
+        tracing::info!("Updating key: {} with value: {:?}", key, value.into());
         let mut scope = self.scope.lock().unwrap();
         scope.set_or_push(key, value.into());
         if let Some(egui_ctx) = &self.egui_ctx {
+            tracing::info!("Requesting repaint");
             egui_ctx.request_repaint();
+        } else {
+            tracing::warn!("Egui context is not set");
         }
     }
 
@@ -43,7 +49,7 @@ pub struct RdxApp {
     components: Vec<Component>,
     rdx_source: String,
     egui_ctx: egui::Context,
-    plugins: Vec<Plugin<State<'static>>>,
+    plugins: Vec<LayerPlugin<State<'static>>>,
 }
 
 impl Default for RdxApp {
@@ -62,21 +68,18 @@ impl RdxApp {
         // set scope count var to 0
         scope.lock().unwrap().set_or_push("count", 0);
 
-        let env: Environment<State> = Environment::new("./plugin_path".into()).unwrap();
-
         let name = "counter";
-        let wasm_path = utils::get_wasm_path(name).unwrap();
-        let wasm_bytes = std::fs::read(wasm_path.clone()).unwrap();
-        let mut plugin = Plugin::new(
-            env.clone(),
-            name,
-            &wasm_bytes,
-            State::new(ctx.clone(), scope.clone()),
-        )
-        .unwrap();
-        let rdx_source = plugin.load_rdx().unwrap();
+        let wasm_bytes =
+            include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm").to_vec();
+        let mut plugin =
+            LayerPlugin::new(name, &wasm_bytes, State::new(ctx.clone(), scope.clone()));
+        let rdx_source = plugin.call("load", &[]).unwrap();
 
         tracing::info!("RDX Source {:?}", rdx_source);
+
+        let Value::String(rdx_source) = rdx_source else {
+            panic!("RDX Source should be a string");
+        };
 
         let components = parse(&rdx_source).unwrap();
 
@@ -86,7 +89,7 @@ impl RdxApp {
             engine,
             scope,
             components,
-            rdx_source,
+            rdx_source: rdx_source.to_string(),
             egui_ctx: ctx,
             plugins: vec![plugin],
         }
@@ -129,7 +132,6 @@ impl RdxApp {
 
                     let text = content.clone().unwrap_or("".to_string());
                     if ui.add(egui::Button::new(&text).fill(color)).clicked() {
-                        tracing::debug!("Button clicked");
                         if let Some(on_click) = props.get("on_click") {
                             // if we had to call Rhai to execute the function:
                             //
@@ -142,7 +144,7 @@ impl RdxApp {
                             tracing::debug!("On click {:?}", on_click);
                             let func_args = functions.get(on_click).unwrap();
                             tracing::debug!("Func args {:?}", func_args);
-                            match self.plugins[0].call(on_click) {
+                            match self.plugins[0].call(on_click, &[]) {
                                 Ok(res) => {
                                     tracing::info!("on_click response {:?}", res);
                                 }

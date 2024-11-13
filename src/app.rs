@@ -1,5 +1,18 @@
 use crate::RdxApp;
 
+/// Left Panel State
+#[derive(serde::Deserialize, serde::Serialize)]
+struct LeftPanelState {
+    fraction: f32,
+}
+
+impl Default for LeftPanelState {
+    fn default() -> Self {
+        Self {
+            fraction: 0.5, // Start with 50% height
+        }
+    }
+}
 /// We derive Deserialize/Serialize so we can persist app state on shutdown.
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)] // if we add new fields, give them default values when deserializing old state
@@ -12,6 +25,10 @@ pub struct TemplateApp {
 
     #[serde(skip)]
     rdx: RdxApp,
+
+    split_state: LeftPanelState,
+
+    source: String,
 }
 
 impl Default for TemplateApp {
@@ -21,6 +38,8 @@ impl Default for TemplateApp {
             label: "Hello World!".to_owned(),
             value: 2.7,
             rdx: RdxApp::default(),
+            split_state: LeftPanelState::default(),
+            source: "".to_string(),
         }
     }
 }
@@ -44,6 +63,8 @@ impl TemplateApp {
             label: "Hello World!".to_owned(),
             value: 2.7,
             rdx: RdxApp::new(cc.egui_ctx.clone()),
+            split_state: LeftPanelState::default(),
+            source: "".to_string(),
         }
     }
 }
@@ -78,58 +99,74 @@ impl eframe::App for TemplateApp {
             });
         });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("eframe template");
-
-            ui.horizontal(|ui| {
-                ui.label("Write something: ");
-                ui.text_edit_singleline(&mut self.label);
-            });
-
-            ui.add(egui::Slider::new(&mut self.value, 0.0..=10.0).text("value"));
-            if ui.button("Increment").clicked() {
-                self.value += 1.0;
-            }
-
-            ui.separator();
-
-            ui.add(egui::github_link_file!(
-                "https://github.com/emilk/eframe_template/blob/main/",
-                "Source code."
-            ));
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                powered_by_egui_and_eframe(ui);
-                egui::warn_if_debug_build(ui);
-            });
+        egui::SidePanel::right("right_panel").show(ctx, |ui| {
+            ui.label("Demos");
+            ui.label("This is a placeholder for a right panel.");
+            ui.label("It could contain e.g. a list of entities.");
         });
 
-        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
-            // Left panel with the RDX source code
-            ui.horizontal(|ui| {
-                ui.add(
-                    egui::TextEdit::multiline(&mut self.rdx.source())
-                        .desired_width(ui.available_width() * 0.5)
-                        .desired_rows(30)
-                        .font(egui::TextStyle::Monospace),
-                );
+        egui::SidePanel::left("inputs").show(ctx, |ui| {
+            egui::TopBottomPanel::top("source_input")
+                .resizable(true)
+                .show_inside(ui, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        ui.label("RDX Source");
+                        ui.add(
+                            egui::TextEdit::multiline(&mut self.source)
+                                .code_editor()
+                                .desired_width(ui.available_width()),
+                        );
 
-                ui.vertical(|ui| {
-                    if ui.button("Update").clicked() {
-                        tracing::info!("Updating components");
-                        // self.rdx.update_components();
-                        ctx.request_repaint();
-                    }
+                        // padding on the bottom
+                        ui.add_space(20.0);
+                    });
+                });
 
+            egui::CentralPanel::default().show_inside(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.label("State");
+                    ui.add(
+                        egui::TextEdit::multiline(&mut self.source)
+                            .code_editor()
+                            .desired_width(ui.available_width()),
+                    );
+
+                    // padding on the bottom
                     ui.add_space(20.0);
-
-                    // Render the components
-                    let all_components = self.rdx.components().clone();
-                    self.rdx.render_component(ui, &all_components);
                 });
             });
         });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.label("Output");
+            ui.separator();
+
+            // Render the components
+            let all_components = self.rdx.components().clone();
+            self.rdx.render_component(ui, &all_components);
+        });
+
+        // egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+        //     // Left panel with the RDX source code
+        //     ui.horizontal(|ui| {
+        //         ui.add(
+        //             egui::TextEdit::multiline(&mut self.rdx.source())
+        //                 .desired_width(ui.available_width() * 0.5)
+        //                 .desired_rows(30)
+        //                 .font(egui::TextStyle::Monospace),
+        //         );
+        //
+        //         ui.vertical(|ui| {
+        //             if ui.button("Update").clicked() {
+        //                 tracing::info!("Updating components");
+        //                 // self.rdx.update_components();
+        //                 ctx.request_repaint();
+        //             }
+        //
+        //             ui.add_space(20.0);
+        //         });
+        //     });
+        // });
     }
 }
 

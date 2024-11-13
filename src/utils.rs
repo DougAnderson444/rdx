@@ -18,7 +18,7 @@ pub fn workspace_dir() -> PathBuf {
 pub fn get_wasm_path(pkg_name: &str) -> Result<PathBuf, super::Error> {
     let pkg_name = pkg_name.replace('-', "_");
     let workspace = workspace_dir();
-    let wasm_path = format!("target/wasm32-wasip1/debug/{pkg_name}.wasm");
+    let wasm_path = format!("target/wasm32-unknown-unknown/debug/{pkg_name}.wasm");
     Ok(workspace.join(wasm_path))
 }
 

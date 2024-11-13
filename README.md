@@ -1,4 +1,8 @@
-# RDX 
+# EDX 
+
+> egui markdown extension (EDX)
+
+Bundle EDX components into WebAssembly then run them as eframe components, natively or in the browser.
 
 eframe template experiment to see if I can parse an RDX format into eframe.
 

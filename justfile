@@ -1,6 +1,6 @@
 build-couter:
   @echo "Building example counter"
-  cargo component build --manifest-path examples/counter/Cargo.toml
+  cargo component build --manifest-path examples/counter/Cargo.toml --target wasm32-unknown-unknown
   # cargo component build --manifest-path examples/counter/Cargo.toml --release
 
 # for each dir in crates which has a `wit` directory in it, AND has src/bindings.rs, build it
@@ -27,3 +27,5 @@ test: build-couter
 run: build-couter
   cargo run
 
+web-dev: build-couter
+  trunk serve --open

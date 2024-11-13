@@ -9,6 +9,7 @@ pub enum Error {
     Parse(#[from] Box<pest::error::Error<Rule>>),
 
     /// Wasmtime error
+    #[cfg(not(target_arch = "wasm32"))]
     #[error("Anyhow Error: {0}")]
     Wasmtime(#[from] wasmtime::Error),
 
@@ -19,4 +20,13 @@ pub enum Error {
     /// Wrong return type
     #[error("Wrong return type: {0}")]
     WrongReturnType(String),
+
+    /// Instance not found
+    #[error("Instance not found")]
+    InstanceNotFound,
+
+    /// From anyhow
+    #[cfg(target_arch = "wasm32")]
+    #[error("Anyhow Error: {0}")]
+    Anyhow(#[from] anyhow::Error),
 }
