@@ -33,7 +33,6 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - run: just build
-      - run: cp target/wasm32-unknown-unknown/**/*.wasm assets/
 
       - name: upload artifacts to target
         uses: actions/upload-artifact@v4
