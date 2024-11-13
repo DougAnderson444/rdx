@@ -33,20 +33,13 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - run: just build
-      - run: cp target/wasm32-unknown-unknown/release/*.wasm assets/
+      - run: cp target/wasm32-unknown-unknown/**/*.wasm assets/
 
       - name: upload artifacts to target
         uses: actions/upload-artifact@v4
         with:
           name: wasm-files-target 
-          path: target/wasm32-unknown-unknown/release/*.wasm
-          overwrite: true
-
-      - name: upload artifacts to assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-files-assets 
-          path: target/wasm32-unknown-unknown/release/*.wasm
+          path: target/wasm32-unknown-unknown/**/*.wasm
           overwrite: true
 
   check:
@@ -59,17 +52,12 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
 
       - uses: actions-rs/toolchain@v1
         with:
@@ -91,17 +79,12 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
       
       - uses: actions-rs/toolchain@v1
         with:
@@ -124,18 +107,13 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
-      
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -157,22 +135,17 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
       
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: nightly # so we can ignore bindings.rs file
           override: true
           components: rustfmt
       - uses: actions-rs/cargo@v1
@@ -190,18 +163,13 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
-      
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -223,22 +191,17 @@ jobs:
       - name: Create directories
         run: |
           mkdir -p target/wasm32-unknown-unknown/release
+          mkdir -p target/wasm32-unknown-unknown/debug
           mkdir -p assets
 
       - uses: actions/download-artifact@v4
         with:
           name: wasm-files-target
-          path: target/wasm32-unknown-unknown/release
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: wasm-files-assets
-          path: assets
-      
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.76.0
+          toolchain: 1.78.0
           target: wasm32-unknown-unknown
           override: true
       - name: Download and install Trunk binary
@@ -281,17 +244,12 @@ jobs:
     - name: Create directories
       run: |
         mkdir -p target/wasm32-unknown-unknown/release
+        mkdir -p target/wasm32-unknown-unknown/debug
         mkdir -p assets
 
     - uses: actions/download-artifact@v4
       with:
         name: wasm-files-target
-        path: target/wasm32-unknown-unknown/release
-
-    - uses: actions/download-artifact@v4
-      with:
-        name: wasm-files-assets
-        path: assets
 
     - name: Building ${{ matrix.TARGET }}
       run: echo "${{ matrix.TARGET }}"
