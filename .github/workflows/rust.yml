@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 on: [push, pull_request, workflow_dispatch]
 
 name: CI Rust Workflow
@@ -8,10 +9,11 @@ env:
 
 permissions:
   actions: read
+  contents: write
 
 jobs:
-  # this job pre-build using `just build` and copies the .wasm files to /dist/ before running other jobs 
-  # all other jobs depend on this one 
+  # this job pre-build using `just build` and uploads the .wasm files before running other jobs 
+  # all other jobs depend on this one
   pre-build:
     name: Pre-Build wasm binaries
     runs-on: ubuntu-latest
