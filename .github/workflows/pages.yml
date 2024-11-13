@@ -53,12 +53,6 @@ jobs:
       - name: Pre-Build using Just
         run: just build
 
-      # Copy /target/ .wasm files to /dist/ and before running trunk build 
-      # so that trunk can find the .wasm files in /dist/ and build the site.
-      - name: Copy .wasm files to /dist/
-        run: |
-          mv target/wasm32-unknown-unknown/release/*.wasm assets/    
-
       - name: Build # build
         # Environment $public_url resolves to the github project page.
         # If using a user/organization page, remove the `${{ github.event.repository.name }}` part.
