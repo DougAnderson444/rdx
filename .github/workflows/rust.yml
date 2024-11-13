@@ -40,6 +40,7 @@ jobs:
         with:
           name: wasm-files-target 
           path: target/wasm32-unknown-unknown/release/*.wasm
+          overwrite: true
 
       - name: upload artifacts to assets
         uses: actions/upload-artifact@v4
