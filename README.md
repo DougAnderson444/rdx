@@ -1,4 +1,4 @@
-# EDX 
+# EDX Framework
 
 > egui markdown extension (EDX)
 
