@@ -7,9 +7,35 @@ env:
   RUSTDOCFLAGS: -D warnings
 
 jobs:
+  # this job pre-build using `just build` and copies the .wasm files to /dist/ before running other jobs 
+  # all other jobs depend on this one 
+  pre-build:
+    name: Pre-Build wasm binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: extractions/setup-just@v2
+
+      # binstall is faster than cargo install
+      - name: Install binstall
+        uses: taiki-e/install-action@cargo-binstall
+        
+      - name: Install cargo-component
+        run: echo yes | cargo binstall cargo-component
+
+      - name: install Rust  
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - run: just build
+      - run: cp target/wasm32-unknown-unknown/release/*.wasm assets/
+
   check:
     name: Check
     runs-on: ubuntu-latest
+    needs: pre-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -25,6 +51,7 @@ jobs:
   check_wasm:
     name: Check wasm32
     runs-on: ubuntu-latest
+    needs: pre-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -40,6 +67,7 @@ jobs:
 
   test:
     name: Test Suite
+    needs: pre-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,6 +85,7 @@ jobs:
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
+    needs: pre-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -72,6 +101,7 @@ jobs:
 
   clippy:
     name: Clippy
+    needs: pre-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +119,7 @@ jobs:
   trunk:
     name: trunk
     runs-on: ubuntu-latest
+    needs: pre-build
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
@@ -104,6 +135,7 @@ jobs:
 
   build:
     runs-on: ${{ matrix.os }}
+    needs: pre-build
     strategy:
       fail-fast: true
       matrix:
@@ -136,17 +168,6 @@ jobs:
     - name: Building ${{ matrix.TARGET }}
       run: echo "${{ matrix.TARGET }}"
      
-    # Use Just commands
-    - uses: extractions/setup-just@v2
-
-    # binstall is faster than cargo install
-    - name: Install binstall
-      uses: taiki-e/install-action@cargo-binstall
-      
-    # We'l need cargo-component to build WIT Components in the Just commands
-    - name: Install cargo-component
-      run: echo yes | cargo binstall cargo-component
-
     - name: install Rust  
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -175,7 +196,6 @@ jobs:
 
     - name: Build (Just + Cross)
       run: |
-        just build
         cross build --verbose --release --target=${{ matrix.TARGET }}
 
     - name: Rename
