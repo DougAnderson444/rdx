@@ -6,6 +6,9 @@ env:
   RUSTFLAGS: -D warnings
   RUSTDOCFLAGS: -D warnings
 
+permissions:
+  actions: read
+
 jobs:
   # this job pre-build using `just build` and copies the .wasm files to /dist/ before running other jobs 
   # all other jobs depend on this one 
@@ -41,6 +44,7 @@ jobs:
         with:
           name: wasm-files-assets 
           path: target/wasm32-unknown-unknown/release/*.wasm
+          overwrite: true
 
   check:
     name: Check
