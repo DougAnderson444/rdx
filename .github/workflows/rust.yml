@@ -1,6 +1,6 @@
 on: [push, pull_request, workflow_dispatch]
 
-name: CI
+name: CI Rust Workflow
 
 env:
   RUSTFLAGS: -D warnings
@@ -105,26 +105,34 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
         - os: macos-latest
           TARGET: aarch64-apple-darwin
 
+        # apple x86_64 
+        - os: macos-latest # for Intel based macs.
+          TARGET: x86_64-apple-darwin
+
         - os: ubuntu-latest
           TARGET: aarch64-unknown-linux-gnu
 
-        - os: ubuntu-latest
-          TARGET: armv7-unknown-linux-gnueabihf
+        # wasmtime doesn't support armv7
+        # - os: ubuntu-latest
+        #   TARGET: armv7-unknown-linux-gnueabihf
 
         - os: ubuntu-latest
           TARGET: x86_64-unknown-linux-gnu
 
-        - os: windows-latest
-          TARGET: x86_64-pc-windows-msvc
-          EXTENSION: .exe
+        # - os: windows-latest
+        #   TARGET: x86_64-pc-windows-msvc
+        #   EXTENSION: .exe
 
     steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
     - name: Building ${{ matrix.TARGET }}
       run: echo "${{ matrix.TARGET }}"
      
@@ -139,11 +147,19 @@ jobs:
     - name: Install cargo-component
       run: echo yes | cargo binstall cargo-component
 
-    - uses: actions/checkout@master
-    - name: Install build dependencies - Rustup
+    - name: install Rust  
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+        targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || contains(matrix.TARGET, 'linux') && 'aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu' || 'x86_64-pc-windows-msvc' }}
+
+    - name: Set default cargo build target
+      if: contains(matrix.TARGET, 'x86_64-apple-darwin')
       run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable --profile default --target ${{ matrix.TARGET }} -y
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        echo "CARGO_BUILD_TARGET=${{ matrix.TARGET }}" >> $GITHUB_ENV
+        rustup target add ${{ matrix.TARGET }}
+        rustup default stable-${{ matrix.TARGET }}
+        rustup show
 
     # For linux, it's necessary to use cross from the git repository to avoid glibc problems
     # Ref: https://github.com/cross-rs/cross/issues/1510
