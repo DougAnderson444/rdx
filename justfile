@@ -1,8 +1,3 @@
-build-counter:
-  @echo "Building example counter"
-  cargo component build --manifest-path examples/counter/Cargo.toml --target wasm32-unknown-unknown
-  # cargo component build --manifest-path examples/counter/Cargo.toml --release
-
 # for each dir in crates which has a `wit` directory in it, AND has src/bindings.rs, build it
 build-wits:
  for dir in crates/*; do \
@@ -16,12 +11,12 @@ build-wits:
 build-examples:
   for dir in examples/*; do \
     if ([ -d $dir/wit ] && [ -f $dir/src/bindings.rs ]); then \
-     cargo component build --manifest-path=$dir/Cargo.toml; \
-     cargo component build --manifest-path=$dir/Cargo.toml --release; \
+     cargo component build --manifest-path=$dir/Cargo.toml --target wasm32-unknown-unknown ; \
+     cargo component build --manifest-path=$dir/Cargo.toml --target wasm32-unknown-unknown --release; \
    fi \
   done
 
-build: build-counter build-wits build-examples
+build: build-wits build-examples
 
 test: build
   cargo test
