@@ -3,13 +3,14 @@ use std::sync::{Arc, Mutex};
 
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
+use crate::Error;
 
 use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
 
 #[derive(Debug, Clone)]
-struct State<'a> {
+pub struct State<'a> {
     scope: Arc<Mutex<Scope<'a>>>,
     egui_ctx: Option<egui::Context>,
 }
@@ -38,71 +39,30 @@ impl Inner for State<'_> {
     }
 }
 
-pub struct RdxApp {
-    scope: Arc<Mutex<Scope<'static>>>,
+/// The details of a plugin
+pub struct PluginDeets {
     components: Vec<Component>,
+    pub plugin: LayerPlugin<State<'static>>,
     rdx_source: String,
-    plugins: HashMap<String, LayerPlugin<State<'static>>>,
 }
 
-impl Default for RdxApp {
-    fn default() -> Self {
-        let ctx = egui::Context::default();
-        Self::new(ctx)
-    }
-}
-
-impl RdxApp {
-    pub fn new(ctx: egui::Context) -> Self {
-        let scope = Arc::new(Mutex::new(Scope::new()));
-
-        // set scope count var to 0
-        scope.lock().unwrap().set_or_push("count", 0);
-
-        let name = "counter";
-        #[cfg(debug_assertions)]
-        let wasm_bytes =
-            include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm").to_vec();
-
-        #[cfg(not(debug_assertions))]
-        let wasm_bytes =
-            include_bytes!("../target/wasm32-unknown-unknown/release/counter.wasm").to_vec();
-
-        let mut plugin = LayerPlugin::new(&wasm_bytes, State::new(ctx.clone(), scope.clone()));
-        let rdx_source = plugin.call("load", &[]).unwrap();
-
-        tracing::info!("RDX Source {:?}", rdx_source);
-
-        let Value::String(rdx_source) = rdx_source else {
-            panic!("RDX Source should be a string");
-        };
-
-        let components = parse(&rdx_source).unwrap();
-
-        tracing::info!("Components {:?}", components);
-
-        let mut plugins = HashMap::new();
-        plugins.insert(name.to_string(), plugin);
-
-        Self {
-            scope,
-            components,
-            rdx_source: rdx_source.to_string(),
-            plugins,
-        }
-    }
-}
-
-impl RdxApp {
-    /// Return the source
-    pub fn source(&self) -> &str {
-        &self.rdx_source
+impl PluginDeets {
+    /// Call a function on the plugin
+    fn call(&mut self, func: &str, args: &[wasm_component_layer::Value]) -> Result<Value, Error> {
+        self.plugin.call(func, args)
     }
 
-    pub fn components(&self) -> &Vec<Component> {
+    /// Return he components
+    pub(crate) fn components(&self) -> &Vec<Component> {
         &self.components
     }
 
+    /// Return the source
+    fn source(&self) -> &str {
+        &self.rdx_source
+    }
+
+    /// Render the components of this plugin
     pub fn render_component(&mut self, ui: &mut egui::Ui, components: &Vec<Component>) {
         for component in components {
             match component {
@@ -141,7 +101,7 @@ impl RdxApp {
                             tracing::debug!("On click {:?}", on_click);
                             let func_args = functions.get(on_click).unwrap();
                             tracing::debug!("Func args {:?}", func_args);
-                            match self.plugins.get_mut("counter").unwrap().call(on_click, &[]) {
+                            match self.call(on_click, &[]) {
                                 Ok(res) => {
                                     tracing::info!("on_click response {:?}", res);
                                 }
@@ -173,7 +133,8 @@ impl RdxApp {
                         //         }
                         //     }
                         // }
-                        template.render(self.scope.lock().unwrap().iter_raw())
+                        let state = self.plugin.store.data();
+                        template.render(state.scope.lock().unwrap().iter_raw())
                     } else {
                         content.to_string()
                     };
@@ -195,3 +156,44 @@ impl RdxApp {
         }
     }
 }
+
+pub struct RdxApp {
+    scope: Arc<Mutex<Scope<'static>>>,
+    pub(crate) plugins: HashMap<String, PluginDeets>,
+}
+
+impl Default for RdxApp {
+    fn default() -> Self {
+        let ctx = egui::Context::default();
+        Self::new(ctx)
+    }
+}
+
+impl RdxApp {
+    pub fn new(ctx: egui::Context) -> Self {
+        let scope = Arc::new(Mutex::new(Scope::new()));
+        scope.lock().unwrap().set_or_push("count", 0);
+
+        let mut plugins = HashMap::new();
+        for (name, wasm_bytes) in crate::BUILTIN_PLUGINS.iter() {
+            let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone(), scope.clone()));
+            let rdx_source = plugin.call("load", &[]).unwrap();
+            let Value::String(rdx_source) = rdx_source else {
+                panic!("RDX Source should be a string");
+            };
+            let components = parse(&rdx_source).unwrap();
+            plugins.insert(
+                name.to_string(),
+                PluginDeets {
+                    components,
+                    plugin,
+                    rdx_source: rdx_source.to_string(),
+                },
+            );
+        }
+
+        Self { scope, plugins }
+    }
+}
+
+impl RdxApp {}

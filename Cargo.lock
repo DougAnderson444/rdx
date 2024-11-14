@@ -883,7 +883,7 @@ dependencies = [
  "thiserror",
  "wasmtime 25.0.3",
  "wasmtime-wasi",
- "wit-bindgen-rt",
+ "wit-bindgen-rt 0.34.0",
 ]
 
 [[package]]
@@ -2431,6 +2431,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
+name = "login"
+version = "0.1.0"
+dependencies = [
+ "wit-bindgen-rt 0.35.0",
+]
+
+[[package]]
 name = "mach2"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3232,6 +3239,7 @@ dependencies = [
  "wasm_component_layer",
  "wasm_runtime_layer",
  "wasmparser 0.219.1",
+ "wasmparser 0.220.0",
  "wasmtime 25.0.3",
  "wasmtime-wasi",
  "wasmtime_runtime_layer",
@@ -4344,6 +4352,20 @@ name = "wasmparser"
 version = "0.219.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c771866898879073c53b565a6c7b49953795159836714ac56a5befb581227c5"
+dependencies = [
+ "ahash",
+ "bitflags 2.6.0",
+ "hashbrown 0.14.5",
+ "indexmap",
+ "semver",
+ "serde",
+]
+
+[[package]]
+name = "wasmparser"
+version = "0.220.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e246c2772ce3ebc83f89a2d4487ac5794cad6c309b2071818a88c7db7c36d87b"
 dependencies = [
  "ahash",
  "bitflags 2.6.0",
@@ -5511,6 +5533,15 @@ name = "wit-bindgen-rt"
 version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "744845cde309b8fa32408d6fb67456449278c66ea4dcd96de29797b302721f02"
+dependencies = [
+ "bitflags 2.6.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.35.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "605d5562e971a823cf5a550a9d69cb7144e9b4969a810043127175517a4e1865"
 dependencies = [
  "bitflags 2.6.0",
 ]

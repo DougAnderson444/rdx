@@ -8,7 +8,7 @@ fn main() -> eframe::Result {
         .with_env_filter("rdx=trace")
         .try_init();
 
-    tracing::info!("Starting Rhai Markdown Extension (RDX)");
+    tracing::info!("Starting eframe extension (EFX)");
 
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
@@ -22,7 +22,7 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     eframe::run_native(
-        "Rhai Markdown Extension",
+        "eFrame Extension (EFX)",
         native_options,
         Box::new(|cc| Ok(Box::new(rdx::TemplateApp::new(cc)))),
     )

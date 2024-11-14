@@ -143,9 +143,13 @@ impl eframe::App for TemplateApp {
             ui.label("Output");
             ui.separator();
 
-            // Render the components
-            let all_components = self.rdx.components().clone();
-            self.rdx.render_component(ui, &all_components);
+            for (name, details) in self.rdx.plugins.iter_mut() {
+                let components = details.components().clone();
+                // render each plugin in a window
+                egui::Window::new(name).show(ctx, |ui| {
+                    details.render_component(ui, &components);
+                });
+            }
         });
     }
 }

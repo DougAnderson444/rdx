@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "examples/counter"]
+members = [".", "examples/counter", "examples/login"]
 
 [package]
 name = "rdx"
@@ -8,10 +8,15 @@ authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 rust-version = "1.78"                                                # Minimum version required to build this project, for wasm-wsip1 target, 1.78 minimum is required.
+default-run = "rdx"
 
 [package.metadata.docs.rs]
 all-features = true
 targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
+
+[[bin]]
+name = "force-build-wasm-bins"
+path = "build.rs"
 
 [dependencies]
 egui = "0.29"
@@ -54,6 +59,9 @@ getrandom = { version = "0.2", features = ["js"] }       # For web builds
 rhai = { version = "1.19", features = ["wasm-bindgen"] }
 js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
+
+[build-dependencies]
+wasmparser = "0.220"
 
 [profile.release]
 opt-level = 2 # fast and small wasm

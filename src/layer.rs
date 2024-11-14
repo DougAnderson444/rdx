@@ -144,7 +144,7 @@ pub fn instantiate_instance<T: Inner>(
 
 /// Plugin struct to store some state
 pub struct LayerPlugin<T: Inner> {
-    store: Store<T, runtime_layer::Engine>,
+    pub(crate) store: Store<T, runtime_layer::Engine>,
     raw_instance: wasm_component_layer::Instance,
 }
 

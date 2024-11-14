@@ -30,3 +30,5 @@ web-dev: build
 check: build
   ./check.sh
 
+force:
+  cargo run --bin force-build-wasm-bins

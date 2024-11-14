@@ -1,4 +1,8 @@
+#![feature(async_closure)]
 #![warn(clippy::all)]
+
+// The build file results
+include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 mod app;
 pub use app::TemplateApp;
