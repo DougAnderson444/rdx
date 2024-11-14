@@ -1,0 +1,35 @@
+package component:plugin;
+
+interface types {
+  /// The Event type.
+  record event {
+    /// The variable name
+    name: string,
+    value: string
+  }
+}
+
+interface host {
+  use types.{event};
+
+  /// emit an event.
+  emit: func(evt: event);
+}
+
+interface run {
+
+  /// Returns the RDX script.
+  load: func() -> string;
+}
+
+/// An example world for the component to target.
+world plugin-world {
+
+  use types.{event};
+
+  /// Import the event handler.
+  import host;
+
+  export run;
+  
+}
