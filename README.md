@@ -6,7 +6,54 @@
 
 > Real gooD eXperiment
 
+🦀 Pure Rust (no JavaScript)
+🥇 All Platforms (Web, Desktop)
+🦕 Extensible - Bring your own eXtensions
+🦺 Safe - Run other peoples' FULL STACK code safely in a WebAssembly 
+
+## Why?
+
+Because we need a way to encapsulate the front end Rust into WebAssembly, so the full stack can be run in a trust minimized manner.
+
 ## What is RDX?
+
+RDX is a combination of 1) Rhai (for control flow logic) and 2) egui markdown (for User Interface). 
+
+For [example](./examples/counter/src/lib.rs), It looks something like this:
+
+```rhai 
+// call the system function `render` on the template with the ctx from scope
+
+// rhai script controls the flow of logic on what to show
+
+if !is_def_var("count") || count == "0" {
+
+    // the render function returns a string of RDX
+    // render is provided by the rhai scope by default
+    render(ctx, `
+        <Vertical>
+            <Button on_click=increment()>Increment</Button>
+            <Button on_click=decrement()>Decrement</Button>
+            <Label>Click to Start counting!</Label>
+        </Vertical>
+    `)
+
+} else {
+
+    // alternate RDX if count is not 0 
+    // the {{count}} is a variable stored in rhai scope
+    render(ctx, `
+        <Vertical>
+            <Button on_click=increment()>Increment</Button>
+            <Button on_click=decrement()>Decrement</Button>
+            <Label>Count is: {{count}}</Label>
+        </Vertical>
+    `)
+
+}
+```
+
+The `increment()` and `decrement()` functions are provided by WebAssembly exported functions. These functions emit a `count` variable that is stored in the Rhai scope, then displayed back in the gui.
 
 Bundle RDX scripts into WebAssembly then run them as eframe components, natively or in the browser.
 
@@ -15,10 +62,6 @@ eframe template experiment to see if I can parse an RDX format into eframe.
 The goal is for this to be the simplest way to get started writing a eGUI app in Rust.
 
 You can compile your app natively or for the web, and share it using Github Pages.
-
-## Why?
-
-Because we need a way to encapsulate the front end Rust into WebAssembly, so the full stack can be run in a trust minimized manner.
 
 ## Getting started
 
