@@ -99,7 +99,7 @@ impl eframe::App for TemplateApp {
                     // list all plugins by name here
                     let Self { rdx, .. } = self;
                     let RdxApp { plugins, .. } = rdx;
-                    for (name, _details) in plugins {
+                    for name in plugins.keys() {
                         ui.toggle_value(&mut true, name);
                     }
                 });
