@@ -29,11 +29,33 @@ impl Guest for Counter {
     /// Say hello!
     fn load() -> String {
         r#"
-            <Vertical>
-                <Button on_click=increment()>Increment</Button>
-                <Button on_click=decrement()>Decrement</Button>
-                <Label>Count is: {{count}}</Label>
-            </Vertical>
+        // call the system function `render` on the template with the ctx from scope
+        
+        // wasm functions are bound to the rhai script on load?
+        // let count = current(); // TODO: register all exported functions with rhai engine
+        // let count = 0;
+
+        if !is_def_var("count") || count == "0" {
+
+            render(ctx, `
+                <Vertical>
+                    <Button on_click=increment()>Increment</Button>
+                    <Button on_click=decrement()>Decrement</Button>
+                    <Label>Click to Start counting!</Label>
+                </Vertical>
+            `)
+
+        } else {
+
+            render(ctx, `
+                <Vertical>
+                    <Button on_click=increment()>Increment</Button>
+                    <Button on_click=decrement()>Decrement</Button>
+                    <Label>Count is: {{count}}</Label>
+                </Vertical>
+            `)
+
+        }
         "#
         .to_string()
     }

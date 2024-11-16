@@ -1,3 +1,13 @@
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    sync::{Arc, LazyLock, Mutex},
+};
+
+use egui::ScrollArea;
+use rhai::Dynamic;
+use tracing_subscriber::fmt::format;
+
 use crate::RdxApp;
 
 /// Left Panel State
@@ -27,8 +37,6 @@ pub struct TemplateApp {
     rdx: RdxApp,
 
     split_state: LeftPanelState,
-
-    source: String,
 }
 
 impl Default for TemplateApp {
@@ -39,7 +47,6 @@ impl Default for TemplateApp {
             value: 2.7,
             rdx: RdxApp::default(),
             split_state: LeftPanelState::default(),
-            source: "".to_string(),
         }
     }
 }
@@ -57,15 +64,7 @@ impl TemplateApp {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
 
-        tracing::debug!("Creating new app state");
-        Self {
-            // Example stuff:
-            label: "Hello World!".to_owned(),
-            value: 2.7,
-            rdx: RdxApp::new(cc.egui_ctx.clone()),
-            split_state: LeftPanelState::default(),
-            source: "".to_string(),
-        }
+        Default::default()
     }
 }
 
@@ -102,10 +101,20 @@ impl eframe::App for TemplateApp {
         });
 
         egui::SidePanel::right("right_panel").show(ctx, |ui| {
-            ui.label("Demos");
-            ui.label("This is a placeholder for a right panel.");
-            ui.label("It could contain e.g. a list of entities.");
+            ScrollArea::vertical().show(ui, |ui| {
+                ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+                    ui.label("Demos");
+                    // list all plugins by name here
+                    let Self { rdx, .. } = self;
+                    let RdxApp { plugins, .. } = rdx;
+                    for (name, details) in plugins {
+                        ui.toggle_value(&mut true, name);
+                    }
+                });
+            });
         });
+
+        let test_text = "Some test text";
 
         egui::SidePanel::left("inputs").show(ctx, |ui| {
             egui::TopBottomPanel::top("source_input")
@@ -114,7 +123,7 @@ impl eframe::App for TemplateApp {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         ui.label("RDX Source");
                         ui.add(
-                            egui::TextEdit::multiline(&mut self.source)
+                            egui::TextEdit::multiline(&mut test_text.to_owned())
                                 .code_editor()
                                 .desired_width(ui.available_width()),
                         );
@@ -128,7 +137,7 @@ impl eframe::App for TemplateApp {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     ui.label("State");
                     ui.add(
-                        egui::TextEdit::multiline(&mut self.source)
+                        egui::TextEdit::multiline(&mut test_text.to_owned())
                             .code_editor()
                             .desired_width(ui.available_width()),
                     );
@@ -143,13 +152,87 @@ impl eframe::App for TemplateApp {
             ui.label("Output");
             ui.separator();
 
-            for (name, details) in self.rdx.plugins.iter_mut() {
-                let components = details.components().clone();
-                // render each plugin in a window
-                egui::Window::new(name).show(ctx, |ui| {
-                    details.render_component(ui, &components);
-                });
+            let Self { rdx, .. } = self;
+            let RdxApp { plugins, .. } = rdx;
+
+            for (name, plugin) in plugins.iter_mut() {
+                // tracing::debug!("Rendering plugin: {}", name);
+                plugin.render_rhai(ctx.clone());
             }
         });
     }
+}
+
+fn try_rhai(ctx: egui::Context) {
+    // Create Rhai engine
+    let mut engine = rhai::Engine::new();
+
+    let id = egui::Id::new("My Rhai Window");
+
+    // Register egui functions
+    engine.register_fn("render", move |ctx: &mut egui::Context, text: &str| {
+        egui::Area::new(id).show(ctx, |ui| {
+            ui.label(text);
+            if ui.button(format!("Button: {}", text)).clicked() {
+                // take some action here
+            }
+        });
+    });
+
+    // Create Rhai script
+    let script = r#"
+        render(ctx, "Hello from Rhai!");
+    "#;
+
+    // Compile script
+    let ast = engine.compile(script).expect("Failed to compile script");
+
+    // Create scope and add ctx
+    let mut scope = rhai::Scope::new();
+    scope.push("ctx", ctx);
+
+    // Execute script
+    engine
+        .run_ast_with_scope(&mut scope, &ast)
+        .expect("Failed to execute script");
+}
+
+/// Wrap the rhai update in a function to ensure that the lifetimes are covered
+fn process_rhai_script(ui: &mut egui::Ui) {
+    let shared_ui: crate::custom_types::SharedUi = Arc::new(Mutex::new(ui)); // <== borrowed data escapes because of the Mutex<&mut Ui>
+                                                                             /**/
+    // let dy = rhai::Dynamic::from(shared_ui.clone());
+
+    let mut engine = rhai::Engine::new();
+    engine.register_global_module(rhai::exported_module!(crate::custom_types::egui_api).into());
+    engine.register_type::<egui::Response>();
+    engine.register_type_with_name::<egui::Response>("Response");
+
+    // FnMut not accepted here, as it mutates ui or doesn't live 'staticenough
+    // let shared_ui_clone = shared_ui.clone();
+    // engine.register_fn("test", move || {
+    //     shared_ui_clone.lock().unwrap().label("Hello, world!");
+    // });
+
+    let mut scope = rhai::Scope::new();
+
+    // Add the singleton command object into a custom Scope.
+    // Constants, as a convention, are named with all-capital letters.
+    // scope.push_constant("ui", shared_ui.clone());
+
+    let script = r#"
+        label(ui, "Hello, world!");
+        let response = button(ui, "Click me!");
+        label(ui, "Button clicked: ".to_owned() + &response.clicked.to_string());
+    "#;
+
+    // Compile script into AST
+    let Ok(ast) = engine.compile(script) else {
+        return;
+    };
+
+    // Run the compiled AST
+    let Ok(_) = engine.run_ast_with_scope(&mut scope, &ast) else {
+        return;
+    };
 }

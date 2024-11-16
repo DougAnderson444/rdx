@@ -1,3 +1,5 @@
+// mod cache;
+
 use pest::Parser;
 use pest_derive::Parser;
 use std::collections::HashMap;
@@ -8,11 +10,22 @@ use crate::{template::Template, Error};
 #[grammar = "egui_layout.pest"]
 struct EguiLayoutParser;
 
+/// Props are a HashMap of key-value pairs
+pub type Props = HashMap<String, String>;
+
+/// Functions are a HashMap of function name and list of arguments
+pub type Functions = HashMap<String, Vec<String>>;
+
+pub struct Function {
+    name: String,
+    args: Vec<String>,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Component {
     Horizontal {
         content: Option<String>,
-        props: HashMap<String, String>,
+        props: Props,
         children: Vec<Component>,
     },
     Vertical {
@@ -35,6 +48,84 @@ pub enum Component {
         content: String,
         props: HashMap<String, String>,
     },
+    TextEdit {
+        content: String,
+        props: HashMap<String, String>,
+        functions: HashMap<String, Vec<String>>,
+        template: Option<Template>,
+    },
+}
+
+impl FromTagName for Component {
+    fn from_tag_name(
+        tag_name: &str,
+        content: Option<String>,
+        props: HashMap<String, String>,
+        children: Vec<Component>,
+        functions: Option<HashMap<String, Vec<String>>>,
+        template: Option<Template>,
+    ) -> Option<Self> {
+        match tag_name {
+            "Horizontal" => Some(Component::Horizontal {
+                content,
+                props,
+                children,
+            }),
+            "Vertical" => Some(Component::Vertical {
+                content,
+                props,
+                children,
+            }),
+            "Button" => Some(Component::Button {
+                content,
+                props,
+                functions: functions.unwrap_or_default(),
+            }),
+            "Label" => Some(Component::Label {
+                content: content.unwrap(),
+                props,
+                template,
+            }),
+            "TextEdit" => Some(Component::TextEdit {
+                content: content.unwrap(),
+                props,
+                functions: functions.unwrap_or_default(),
+                template,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// Helper trait to map a tag name to a Component enum variant
+trait FromTagName {
+    fn from_tag_name(
+        tag_name: &str,
+        content: Option<String>,
+        props: Props,
+        children: Vec<Component>,
+        functions: Option<Functions>,
+        template: Option<Template>,
+    ) -> Option<Self>
+    where
+        Self: Sized;
+}
+
+/// Helper macro to create a Component from a tag name
+macro_rules! component_from_tag {
+    ($tag_name:expr, $content:expr, $props:expr, $children:expr, $functions:expr, $template:expr, $span:expr) => {
+        Component::from_tag_name(
+            $tag_name, $content, $props, $children, $functions, $template,
+        )
+        .ok_or_else(|| {
+            Error::Parse(Box::new(pest::error::Error::new_from_span(
+                pest::error::ErrorVariant::CustomError {
+                    message: format!("Unknown tag name: {}", $tag_name),
+                },
+                $span,
+            )))
+        })
+    };
 }
 
 fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Error> {
@@ -86,7 +177,7 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                         let func_name = func_inner.next().unwrap().as_str().to_string();
                         let args = func_inner
                             .filter_map(|p| match p.as_rule() {
-                                Rule::string => Some(p.as_str().to_string()),
+                                Rule::identifier => Some(p.as_str().to_string()),
                                 _ => None,
                             })
                             .collect();
@@ -147,36 +238,16 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                 .map(Some)
                 .unwrap_or(None);
 
-            let res = match tag_name {
-                "Horizontal" => Component::Horizontal {
-                    content,
-                    props,
-                    children,
-                },
-                "Vertical" => Component::Vertical {
-                    content,
-                    props,
-                    children,
-                },
-                "Button" => Component::Button {
-                    content,
-                    props,
-                    functions,
-                },
-                "Label" => Component::Label {
-                    content: content.unwrap(),
-                    props,
-                    template,
-                },
-                _ => {
-                    return Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
-                        pest::error::ErrorVariant::CustomError {
-                            message: format!("Unknown tag: {}", tag_name),
-                        },
-                        span,
-                    ))))
-                }
-            };
+            let res = component_from_tag!(
+                tag_name,
+                content,
+                props,
+                children,
+                Some(functions),
+                template,
+                span
+            )?;
+
             Ok(res)
         }
         _ => Err(Error::Parse(Box::new(pest::error::Error::new_from_span(
@@ -382,6 +453,79 @@ mod tests {
                             props: HashMap::default(),
                             template: Some(Template::new("The count is {{count}}")),
                         }]
+                    }
+                ]
+            }]
+        );
+    }
+
+    // TextEdit for username and password
+    #[test]
+    fn test_text_edit() {
+        let input = r#"
+            <Vertical>
+                <TextEdit on_change=handle_change(username)>Username is {{username}}</TextEdit>
+                <TextEdit on_change=handle_change(password)>Password</TextEdit>
+                <Button on_click=login(username,password)>Login</Button>
+                <Button on_click=logout(username, password)>Logout</Button>
+            </Vertical>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            vec![Component::Vertical {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::TextEdit {
+                        content: "Username is {{username}}".to_string(),
+                        props: vec![("on_change".to_string(), "handle_change".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "handle_change".to_string(),
+                            vec!["username".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                        template: Some(Template::new("Username is {{username}}")),
+                    },
+                    Component::TextEdit {
+                        content: "Password".to_string(),
+                        props: vec![("on_change".to_string(), "handle_change".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "handle_change".to_string(),
+                            vec!["password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                        template: None
+                    },
+                    Component::Button {
+                        content: Some("Login".to_string()),
+                        props: vec![("on_click".to_string(), "login".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "login".to_string(),
+                            vec!["username".to_string(), "password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                    },
+                    Component::Button {
+                        content: Some("Logout".to_string()),
+                        props: vec![("on_click".to_string(), "logout".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "logout".to_string(),
+                            vec!["username".to_string(), "password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
                     }
                 ]
             }]

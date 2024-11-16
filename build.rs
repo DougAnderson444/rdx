@@ -20,7 +20,7 @@ fn main() {
 
     let project_root = std::env::current_dir().expect("Failed to get current directory");
 
-    let mut code = "pub static BUILTIN_PLUGINS: [(String, &[u8]); 0] = [];".to_string();
+    let mut code = "pub static BUILTIN_PLUGINS: [(&str, &[u8]); 0] = [];".to_string();
 
     if let Ok(dir) = std::fs::read_dir(project_root.join(dir_path)) {
         let this_root_crate = env::var("CARGO_PKG_NAME").unwrap_or_default();

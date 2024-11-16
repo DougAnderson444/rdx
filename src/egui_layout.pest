@@ -11,8 +11,8 @@ inner_string = @{ (!("\"" | "<" | ">" | "(" | ")") ~ ANY)+ }
 /// _SILENT Rule: Doesn't produce Rule:: token. Str literals (with quotes)
 string = _{ "\"" ~ inner_string ~ "\"" }
 
-/// Function call
-functions = { identifier ~ "(" ~ (string)* ~ ")" }
+/// Function call, with zero or more arguments separated by commas and zero or more spaces
+functions = { identifier ~ "(" ~ (identifier ~ (WHITESPACE* ~ "," ~ WHITESPACE* ~ identifier)*)? ~ ")" }
 
 // Attribute cn be either a string or a function call, but musy have one of them
 attribute = { identifier ~ "=" ~ (string | functions) }

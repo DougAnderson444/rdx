@@ -18,8 +18,12 @@ interface host {
 
 interface run {
 
-  /// Returns the RDX script.
+  /// loads just the XML like markdown
   load: func() -> string;
+
+  /// login 
+  login: func(username: string, password: string);
+
 }
 
 /// An example world for the component to target.

@@ -96,9 +96,26 @@ pub mod exports {
                     let l1 = *arg0.add(4).cast::<usize>();
                     _rt::cabi_dealloc(l0, l1, 1);
                 }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_login_cabi<T: Guest>(
+                    arg0: *mut u8,
+                    arg1: usize,
+                    arg2: *mut u8,
+                    arg3: usize,
+                ) {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len0 = arg1;
+                    let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
+                    let len1 = arg3;
+                    let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
+                    T::login(_rt::string_lift(bytes0), _rt::string_lift(bytes1));
+                }
                 pub trait Guest {
-                    /// Returns the RDX script.
+                    /// loads just the XML like markdown
                     fn load() -> _rt::String;
+                    /// login
+                    fn login(username: _rt::String, password: _rt::String);
                 }
                 #[doc(hidden)]
                 macro_rules! __export_component_plugin_run_cabi {
@@ -108,7 +125,11 @@ pub mod exports {
                         $($path_to_types)*:: _export_load_cabi::<$ty > () } #[export_name
                         = "cabi_post_component:plugin/run#load"] unsafe extern "C" fn
                         _post_return_load(arg0 : * mut u8,) { $($path_to_types)*::
-                        __post_return_load::<$ty > (arg0) } };
+                        __post_return_load::<$ty > (arg0) } #[export_name =
+                        "component:plugin/run#login"] unsafe extern "C" fn
+                        export_login(arg0 : * mut u8, arg1 : usize, arg2 : * mut u8, arg3
+                        : usize,) { $($path_to_types)*:: _export_login_cabi::<$ty >
+                        (arg0, arg1, arg2, arg3) } };
                     };
                 }
                 #[doc(hidden)]
@@ -134,6 +155,14 @@ mod _rt {
         }
         let layout = alloc::Layout::from_size_align_unchecked(size, align);
         alloc::dealloc(ptr, layout);
+    }
+    pub use alloc_crate::vec::Vec;
+    pub unsafe fn string_lift(bytes: Vec<u8>) -> String {
+        if cfg!(debug_assertions) {
+            String::from_utf8(bytes).unwrap()
+        } else {
+            String::from_utf8_unchecked(bytes)
+        }
     }
     extern crate alloc as alloc_crate;
     pub use alloc_crate::alloc;
@@ -171,15 +200,16 @@ pub(crate) use __export_plugin_world_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.30.0:plugin-world:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 355] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xe0\x01\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 390] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x83\x02\x01A\x02\x01\
 A\x08\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\x01\x16com\
 ponent:plugin/types\x05\0\x02\x03\0\0\x05event\x01B\x04\x02\x03\x02\x01\x01\x04\0\
 \x05event\x03\0\0\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\x02\x03\x01\x15com\
-ponent:plugin/host\x05\x02\x03\0\x05event\x03\0\x01\x01B\x02\x01@\0\0s\x04\0\x04\
-load\x01\0\x04\x01\x14component:plugin/run\x05\x04\x04\x01\x1dcomponent:plugin/p\
-lugin-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cp\
-rocessed-by\x02\x0dwit-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+ponent:plugin/host\x05\x02\x03\0\x05event\x03\0\x01\x01B\x04\x01@\0\0s\x04\0\x04\
+load\x01\0\x01@\x02\x08usernames\x08passwords\x01\0\x04\0\x05login\x01\x01\x04\x01\
+\x14component:plugin/run\x05\x04\x04\x01\x1dcomponent:plugin/plugin-world\x04\0\x0b\
+\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwi\
+t-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

@@ -120,7 +120,6 @@ pub fn instantiate_instance<T: Inner>(
                 FuncType::new([params], results),
                 move |mut store, params, _results| {
                     tracing::info!("Emitting event {:?}", params);
-                    // [Record(Record { fields: [("name", String("count")), ("value", String("1"))], ty: RecordType { fields: [(0, "name", String), (1, "value", String)], name: Some(component:plugin/types.event) } })]
                     if let Value::Record(record) = &params[0] {
                         let name = record.field("name").unwrap();
                         let value = record.field("value").unwrap();
@@ -192,6 +191,7 @@ mod tests {
         fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy) {
             println!("updating {}: {}", key, value.into());
             // set count to value
+            // TODO: Chg hard code into rhai scope change
             if key == "count" {
                 self.count = value.into();
             }

@@ -42,7 +42,7 @@ wasm_runtime_layer = "0.4"
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
-rhai = { version = "1.19", features = ["sync"] }
+rhai = { version = "1.19" }
 # TODO: Feature gate this & use jco for wasm-bindgen builds
 wasmtime = { version = "25" }
 wasmtime-wasi = { version = "25" }
