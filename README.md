@@ -8,8 +8,13 @@
 
 - 🦀 Pure Rust (no JavaScript)
 - 🥇 All Platforms (Web, Desktop)
-- 🦕 Extensible - Bring your own eXtensions
-- 🦺 Safe - Run other peoples' FULL STACK code safely in a WebAssembly 
+- 🦕 Extensible - Bring your own eXtensions, or run other's privately
+- 🦺 Safe - FULL STACK code safely in a WebAssembly 
+- 🚀 Fast - WebAssembly is fast, and Rhai is Fast 
+- 🎨 Beautiful - eGUI is beautiful, and Rhai is simple 
+- 📦 Bundled - Everything you need in one package 
+- 🌐 Web - Deploy to the web with Trunk 
+- 📱 Mobile - Coming soon 
 
 ## Why?
 
@@ -17,7 +22,10 @@ Because we need a way to encapsulate full stack apps into WebAssembly, so they c
 
 ## What is RDX?
 
-RDX is a combination of 1) Rhai (for control flow logic) and 2) egui markdown (for User Interface). 
+RDX is a combination of: 
+
+1. Rhai (for control flow logic) and 
+2. 🆕 egui markdown (for User Interface). 
 
 For [example](./examples/counter/src/lib.rs), It looks something like this:
 
@@ -66,12 +74,6 @@ You can compile your app natively or for the web, and share it using Github Page
 ## Getting started
 
 Build a component in either pure Rhai or Rhai + Rust compiled to WASM.
-
-### Learning about egui
-
-```ignore
-todo!()
-```
 
 ### Testing locally
 
