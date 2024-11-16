@@ -16,11 +16,6 @@ pub type Props = HashMap<String, String>;
 /// Functions are a HashMap of function name and list of arguments
 pub type Functions = HashMap<String, Vec<String>>;
 
-pub struct Function {
-    name: String,
-    args: Vec<String>,
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Component {
     Horizontal {

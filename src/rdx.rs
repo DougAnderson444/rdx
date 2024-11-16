@@ -1,10 +1,8 @@
-use std::cell::RefCell;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
-use crate::Error;
 
 use rhai::{Dynamic, Scope};
 use tracing::error;
@@ -42,11 +40,10 @@ impl Inner for State<'_> {
 
 /// The details of a plugin
 pub struct PluginDeets {
-    name: String,
     /// Reference counted so we can pass it into the rhai engine closure
     pub plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
-    /// Here for display purposes only, once it's compiled we're done using it.
-    rdx_source: String,
+    // Could be here for display purposes only, once it's compiled we're done using it.
+    // rdx_source: String,
     engine: rhai::Engine,
     ast: Option<rhai::AST>,
 }
@@ -84,9 +81,7 @@ impl PluginDeets {
         };
 
         Self {
-            name,
             plugin,
-            rdx_source,
             engine,
             ast,
         }
@@ -108,22 +103,6 @@ impl PluginDeets {
                 error!("Failed to execute script: {:?}", e);
             }
         }
-    }
-}
-
-impl PluginDeets {
-    /// Call a function on the plugin
-    fn call(&mut self, func: &str, args: &[wasm_component_layer::Value]) -> Result<Value, Error> {
-        self.plugin.lock().unwrap().call(func, args)
-    }
-
-    /// Return the source
-    fn source(&self) -> &str {
-        &self.rdx_source
-    }
-
-    fn name(&self) -> &str {
-        &self.name
     }
 }
 
@@ -249,9 +228,6 @@ pub fn render_component(
 }
 pub struct RdxApp {
     pub(crate) plugins: HashMap<String, PluginDeets>,
-
-    /// A Set of the open plugins
-    open: BTreeSet<String>,
 }
 
 impl Default for RdxApp {
@@ -261,21 +237,8 @@ impl Default for RdxApp {
     }
 }
 
-/// Adjusts the open set based on the key and is_open
-fn set_open(open: &mut BTreeSet<String>, key: &'static str, is_open: bool) {
-    if is_open {
-        if !open.contains(key) {
-            open.insert(key.to_owned());
-        }
-    } else {
-        open.remove(key);
-    }
-}
-
 impl RdxApp {
     pub fn new(ctx: egui::Context) -> Self {
-        let mut open = BTreeSet::new();
-
         let mut plugins = HashMap::new();
         for (name, wasm_bytes) in crate::BUILTIN_PLUGINS.iter() {
             let scope = Scope::new();
@@ -292,14 +255,9 @@ impl RdxApp {
                 name.to_string(),
                 PluginDeets::new(name.to_string(), plugin, rdx_source.to_string()),
             );
-
-            open.insert(name.to_string());
         }
 
-        Self {
-            plugins,
-            open: BTreeSet::new(),
-        }
+        Self { plugins }
     }
 }
 

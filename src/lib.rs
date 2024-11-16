@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 #![warn(clippy::all)]
 
 // The build file results
@@ -19,7 +18,3 @@ mod layer;
 // mod plugins;
 mod template;
 mod utils;
-
-/// The Custom type module for exports
-mod custom_types;
-pub use custom_types::SharedUi;

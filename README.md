@@ -1,14 +1,24 @@
-# EFX Framework
+# RDX
 
-> eframe extension (EFX)
+> Rhai markDown egui eXtensions (RDX)
 
-Bundle EFX components into WebAssembly then run them as eframe components, natively or in the browser.
+> Rust Developer eXperience (RDX)
+
+> Real gooD eXperiment
+
+## What is RDX?
+
+Bundle RDX scripts into WebAssembly then run them as eframe components, natively or in the browser.
 
 eframe template experiment to see if I can parse an RDX format into eframe.
 
 The goal is for this to be the simplest way to get started writing a eGUI app in Rust.
 
 You can compile your app natively or for the web, and share it using Github Pages.
+
+## Why?
+
+Because we need a way to encapsulate the front end Rust into WebAssembly, so the full stack can be run in a trust minimized manner.
 
 ## Getting started
 
