@@ -14,9 +14,9 @@ default-run = "rdx"
 all-features = true
 targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 
-[[bin]]
-name = "force-build-wasm-bins"
-path = "build.rs"
+# [[bin]]
+# name = "force-build-wasm-bins"
+# path = "build.rs"
 
 [dependencies]
 egui = "0.29"
@@ -42,7 +42,7 @@ wasm_runtime_layer = "0.4"
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
-rhai = { version = "1.19" }
+rhai = { version = "1.19", features = ["sync"] }
 # TODO: Feature gate this & use jco for wasm-bindgen builds
 wasmtime = { version = "25" }
 wasmtime-wasi = { version = "25" }
