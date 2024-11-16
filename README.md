@@ -6,14 +6,14 @@
 
 > Real gooD eXperiment
 
-🦀 Pure Rust (no JavaScript)
-🥇 All Platforms (Web, Desktop)
-🦕 Extensible - Bring your own eXtensions
-🦺 Safe - Run other peoples' FULL STACK code safely in a WebAssembly 
+- 🦀 Pure Rust (no JavaScript)
+- 🥇 All Platforms (Web, Desktop)
+- 🦕 Extensible - Bring your own eXtensions
+- 🦺 Safe - Run other peoples' FULL STACK code safely in a WebAssembly 
 
 ## Why?
 
-Because we need a way to encapsulate the front end Rust into WebAssembly, so the full stack can be run in a trust minimized manner.
+Because we need a way to encapsulate full stack apps into WebAssembly, so they can be run in a trustless way.
 
 ## What is RDX?
 
