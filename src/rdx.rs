@@ -175,7 +175,13 @@ pub fn render_component(
                 let content = if let Some(template) = template {
                     let lock = plugin.lock().unwrap();
                     let state = lock.store.data();
-                    template.render(state.scope.iter_raw())
+                    // map the key, is_constant, valure to &str, &str iterator
+                    let entries = state
+                        .scope
+                        .iter()
+                        .map(|(k, _c, v)| (k, v.to_string()))
+                        .collect::<Vec<_>>();
+                    template.render(entries)
                 } else {
                     content.to_string()
                 };

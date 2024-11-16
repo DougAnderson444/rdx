@@ -1,5 +1,3 @@
-use rhai::Dynamic;
-
 /// Holds the template parts (Static and Dynamic).
 ///
 /// Renders the template with the provided values.
@@ -59,23 +57,19 @@ impl Template {
     /// the key.
     pub(crate) fn render<'a>(
         &self,
-        mut values: impl Iterator<Item = (&'a str, bool, &'a Dynamic)>,
+        values: impl IntoIterator<Item = (&'a str, String)> + Clone,
     ) -> String {
         let mut result = String::new();
+
         for part in &self.parts {
+            let vals = values.clone();
+            eprintln!("part: {:?}", part);
             match part {
                 TemplatePart::Static(s) => result.push_str(s),
                 TemplatePart::Dynamic(key) => {
                     if let Some(value) =
-                        values.find_map(
-                            |(k, _, v)| {
-                                if k == key {
-                                    Some(v.to_string())
-                                } else {
-                                    None
-                                }
-                            },
-                        )
+                        vals.into_iter()
+                            .find_map(|(k, v)| if k == key { Some(v) } else { None })
                     {
                         result.push_str(&value);
                     } else {
@@ -90,7 +84,7 @@ impl Template {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, str::FromStr as _};
+    use std::collections::HashMap;
 
     use super::*;
 
@@ -98,23 +92,40 @@ mod tests {
     fn test_template() {
         let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
         let mut values = HashMap::new();
-        values.insert(
-            "word_var".to_string(),
-            Dynamic::from_str("template").unwrap(),
-        );
-        values.insert("a_value".to_string(), Dynamic::from_str("content").unwrap());
+        values.insert("word_var", "template".to_string());
+        values.insert("a_value", "content".to_string());
 
-        let result = template.render(values.iter().map(|(k, v)| (k.as_str(), false, v)));
+        let result = template.render(values.iter().map(|(k, v)| (*k, v.clone())));
         assert_eq!(result, "This template is replaced with content");
     }
 
+    #[test]
+    fn test_three_replacements() {
+        let template =
+            Template::new("This {{word_var}} is replaced with {{a_value}} or these {{words_here}}");
+
+        // print the template
+        eprintln!("{:?}", template);
+
+        let mut values = HashMap::new();
+        values.insert("word_var", "template".to_string());
+        values.insert("a_value", "content".to_string());
+        values.insert("words_here", "other words".to_string());
+
+        let result = template.render(values.iter().map(|(k, v)| (*k, v.clone())));
+        assert_eq!(
+            result,
+            "This template is replaced with content or these other words"
+        );
+    }
     // handle the case where a placeholder in the template doesn't have a corresponding value in the provided HashMap.
     #[test]
     fn test_missing_value() {
         let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
-        let values: HashMap<_, Dynamic> = HashMap::<String, rhai::Dynamic>::new();
+        let values: HashMap<&str, &str> = HashMap::<&str, &str>::new();
 
-        let result = template.render(values.iter().map(|(k, v)| (k.as_str(), false, v)));
+        let result = template.render(values.iter().map(|(k, v)| (*k, v.to_string())));
+
         assert_eq!(result, "This {{word_var}} is replaced with {{a_value}}");
     }
 }
