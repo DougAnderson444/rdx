@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
+use crate::template::TemplatePart;
 
 use rhai::{Dynamic, Scope};
 use tracing::error;
@@ -40,6 +41,8 @@ impl Inner for State<'_> {
 
 /// The details of a plugin
 pub struct PluginDeets {
+    /// name of this plugin
+    name: String,
     /// Reference counted so we can pass it into the rhai engine closure
     pub plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
     // Could be here for display purposes only, once it's compiled we're done using it.
@@ -84,6 +87,7 @@ impl PluginDeets {
             plugin,
             engine,
             ast,
+            name,
         }
     }
 
@@ -93,7 +97,7 @@ impl PluginDeets {
             let mut plugin = self.plugin.lock().unwrap();
             plugin.store.data_mut().scope.set_or_push("ctx", ctx);
             let scope = plugin.store.data().scope.clone();
-            tracing::info!("Scope: {:?}", scope);
+            tracing::info!("[{}] Scope: {:?}", self.name, scope);
             scope
         };
 
@@ -200,33 +204,74 @@ pub fn render_component(
                 ui.add_space(4.0);
             }
             Component::TextEdit {
-                content,
                 props,
                 functions,
-                template: _,
+                template,
+                ..
             } => {
-                let text = content;
-                let mut value = text.clone();
-                if let Some(on_change) = props.get("on_change") {
-                    if let Some(func_args) = functions.get(on_change) {
-                        let args = func_args
-                            .iter()
-                            .map(|v| Value::String(v.to_string().into()))
-                            .collect::<Vec<_>>();
-                        if let Ok(res) = plugin.lock().unwrap().call(on_change, args.as_slice()) {
-                            match res {
-                                Value::String(s) => {
-                                    value = s.to_string();
+                // 1. Get the variable from the template Dynamic String (there should only be one)
+                // 2. Put the rhai::Scope value of that variable into the textEdit.
+                // 3. on TextEdit changed(), update the rhai::Scope value of that variable
+
+                // Variable name from template value
+                // take the first Dynamic String from the template
+                let var_name = template.as_ref().and_then(|t| {
+                    t.parts.iter().find_map(|part| match part {
+                        TemplatePart::Dynamic(s) => Some(s),
+                        _ => None,
+                    })
+                });
+
+                tracing::info!("Template var name: {:?}", var_name);
+
+                if let Some(var_name) = var_name {
+                    // Get the value of the variable from the rhai::Scope
+                    // Put the value into rhai::Scope as the value of the variable
+                    // Can I just linkt he rhai scope variable to the TextEdit widget?
+                    let mut lock = plugin.lock().unwrap();
+                    let scope = &mut lock.store.data_mut().scope;
+
+                    if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
+                        let response = ui.add(egui::TextEdit::singleline(&mut val));
+                        if response.changed() {
+                            // update the scope variable
+                            scope.set_or_push(var_name.as_str(), val);
+
+                            // also call the on_change function
+                            if let Some(on_change) = props.get("on_change") {
+                                if let Some(func_args) = functions.get(on_change) {
+                                    let args = func_args
+                                        .iter()
+                                        .map(|v| Value::String(v.to_string().into()))
+                                        .collect::<Vec<_>>();
+                                    if let Ok(value) = lock.call(on_change, args.as_slice()) {
+                                        match value {
+                                            Value::String(_s) => {
+                                                // TODO: set the scope variable to the returned value of on_change fn?
+                                                // scope.set_or_push(var_name.as_str(), s);
+                                            }
+                                            Value::Bool(_) => {}
+                                            _ => {}
+                                        }
+                                    } else {
+                                        error!("Failed to call on_change function: {}", on_change);
+                                    }
                                 }
-                                Value::Bool(b) => {
-                                    value = b.to_string();
-                                }
-                                _ => {}
                             }
                         }
+                    } else {
+                        scope.set_or_push(var_name.as_str(), format!("inital {}", var_name));
                     }
+
+                    // This doesn't work, see: https://github.com/rhaiscript/rhai/issues/933
+                    // if let Some(var_ptr) = scope.get_value_mut::<String>(var_name.as_str()) {
+                    //     ui.text_edit_singleline(var_ptr);
+                    // } else {
+                    //     tracing::error!("Failed to get var: {}", var_name);
+                    //     scope.set_or_push(var_name.as_str(), format!("inital {}", var_name));
+                    // }
                 }
-                ui.text_edit_singleline(&mut value);
+
                 ui.add_space(4.0);
             }
         }
