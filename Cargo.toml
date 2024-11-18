@@ -3,8 +3,8 @@ members = [".", "examples/counter", "examples/login", "examples/random"]
 
 [package]
 name = "rdx"
-version = "0.1.0"
-authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
+version = "0.1.1"
+authors = ["Doug Anderson <doug@peerpiper.io>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
 rust-version = "1.78"                                                # Minimum version required to build this project, for wasm-wsip1 target, 1.78 minimum is required.
