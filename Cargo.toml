@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "examples/counter", "examples/login"]
+members = [".", "examples/counter", "examples/login", "examples/random"]
 
 [package]
 name = "rdx"
@@ -38,6 +38,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
 wasm_component_layer = "0.1.18"
 wasm_runtime_layer = "0.4"
+rand = "0.8"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
