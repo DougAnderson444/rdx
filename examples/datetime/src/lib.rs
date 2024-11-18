@@ -9,12 +9,10 @@ struct Component;
 
 impl Guest for Component {
     fn load() -> String {
-        let now = Self::datetime();
-
         // send the variable and it's value to Rhai scope
         emit(&Event {
             name: "datetime".to_string(),
-            value: now,
+            value: Self::datetime(),
         });
 
         r#"
