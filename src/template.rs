@@ -63,7 +63,6 @@ impl Template {
 
         for part in &self.parts {
             let vals = values.clone();
-            eprintln!("part: {:?}", part);
             match part {
                 TemplatePart::Static(s) => result.push_str(s),
                 TemplatePart::Dynamic(key) => {

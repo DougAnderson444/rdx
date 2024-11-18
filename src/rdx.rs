@@ -41,8 +41,6 @@ impl Inner for State<'_> {
 
 /// The details of a plugin
 pub struct PluginDeets {
-    /// name of this plugin
-    name: String,
     /// Reference counted so we can pass it into the rhai engine closure
     pub plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
     // Could be here for display purposes only, once it's compiled we're done using it.
@@ -57,7 +55,7 @@ impl PluginDeets {
 
         let plugin = Arc::new(Mutex::new(plugin));
         let plugin_clone = plugin.clone();
-        let id = format!("RDX Window for: {}", name);
+        let id = name.to_string();
 
         engine.register_fn("render", move |ctx: egui::Context, text: &str| {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
@@ -87,7 +85,6 @@ impl PluginDeets {
             plugin,
             engine,
             ast,
-            name,
         }
     }
 
@@ -97,7 +94,6 @@ impl PluginDeets {
             let mut plugin = self.plugin.lock().unwrap();
             plugin.store.data_mut().scope.set_or_push("ctx", ctx);
             let scope = plugin.store.data().scope.clone();
-            tracing::info!("[{}] Scope: {:?}", self.name, scope);
             scope
         };
 
@@ -221,8 +217,6 @@ pub fn render_component(
                         _ => None,
                     })
                 });
-
-                tracing::info!("Template var name: {:?}", var_name);
 
                 if let Some(var_name) = var_name {
                     // Get the value of the variable from the rhai::Scope

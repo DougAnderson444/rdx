@@ -15,75 +15,6 @@ pub trait Inner {
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
 }
 
-// pub struct Layer<T: Inner> {
-//     linker: Linker,
-//     engine: Engine<runtime_layer::Engine>,
-//     store: Store<T, runtime_layer::Engine>,
-// }
-//
-// impl<T: Inner> Layer<T> {
-//     pub fn new(data: T) -> Self {
-//         let engine = Engine::new(runtime_layer::Engine::default());
-//         let store = Store::new(&engine, data);
-//         Self {
-//             linker: Linker::default(),
-//             engine,
-//             store,
-//         }
-//     }
-//
-//     /// Adds the import to the linker
-//     pub fn add_to_linker(&mut self, interface: &str, name: &str) {
-//         let host_interface = self
-//             .linker
-//             .define_instance(interface.try_into().unwrap())
-//             .unwrap();
-//
-//         // params is a record with name and value
-//         let record = RecordType::new(
-//             Some(TypeIdentifier::new(
-//                 "event",
-//                 Some(InterfaceIdentifier::new(
-//                     "component:plugin".try_into().unwrap(),
-//                     "types",
-//                 )),
-//             )),
-//             vec![("name", ValueType::String), ("value", ValueType::String)],
-//         )
-//         .unwrap();
-//
-//         tracing::info!("Record {:?}", record);
-//
-//         let params = ValueType::Record(record);
-//         let results = [];
-//
-//         host_interface
-//             .define_func(
-//                 name,
-//                 Func::new(
-//                     &mut self.store,
-//                     FuncType::new([params], results),
-//                     move |mut store, params, _results| {
-//                         if let Value::String(name) = &params[0] {
-//                             if let Value::String(value) = &params[1] {
-//                                 store.data_mut().update(name, &**value);
-//                             }
-//                         }
-//
-//                         Ok(())
-//                     },
-//                 ),
-//             )
-//             .unwrap();
-//     }
-//
-//     pub fn instantiate(&mut self, component: Component) -> Instance {
-//         self.linker
-//             .instantiate(&mut self.store, &component)
-//             .unwrap()
-//     }
-// }
-
 pub fn instantiate_instance<T: Inner>(
     bytes: &[u8],
     data: T,
@@ -132,6 +63,22 @@ pub fn instantiate_instance<T: Inner>(
                         }
                     }
 
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
+
+    // add func get_random
+    host_interface
+        .define_func(
+            "random-byte",
+            Func::new(
+                &mut store,
+                FuncType::new([], [ValueType::U8]),
+                move |_store, _params, results| {
+                    let random = rand::random::<u8>();
+                    results[0] = Value::U8(random);
                     Ok(())
                 },
             ),
