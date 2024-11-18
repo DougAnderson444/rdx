@@ -4,7 +4,8 @@ mod bindings;
 use bindings::component::plugin::host::{emit, random_byte};
 use bindings::component::plugin::types::Event;
 use bindings::exports::component::plugin::run::Guest;
-use getrandom::register_custom_getrandom;
+
+use rand::RngCore;
 use std::fmt::Write;
 
 /// Custom function to use the import for random byte generation.
@@ -21,7 +22,7 @@ fn imported_random(dest: &mut [u8]) -> Result<(), getrandom::Error> {
     Ok(())
 }
 
-register_custom_getrandom!(imported_random);
+getrandom::register_custom_getrandom!(imported_random);
 
 struct Component;
 
@@ -51,7 +52,12 @@ impl Guest for Component {
     // Return the random number
     fn random() -> Vec<u8> {
         let mut buf = vec![0u8; 32];
-        getrandom::getrandom(&mut buf).unwrap();
+
+        // could also use getrandom crate
+        // getrandom::getrandom(&mut buf).unwrap();
+
+        let mut rng = rand::thread_rng();
+        rng.fill_bytes(&mut buf);
 
         // converts the vec to a string, use fold and write!() to format the string
         let value = buf.iter().fold(String::new(), |mut acc, &x| {

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 wit-bindgen-rt = { version = "0.35.0", features = ["bitflags"] }
 getrandom = { version = "0.2", features = ["custom"] }
+rand = "0.8"
 
 [lib]
 crate-type = ["cdylib"]
