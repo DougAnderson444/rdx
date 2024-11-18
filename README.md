@@ -75,6 +75,9 @@ You can compile your app natively or for the web, and share it using Github Page
 
 Build a component in either pure Rhai or Rhai + Rust compiled to WASM.
 
+1. Get an eframe environment set up using [eframe_template](https://github.com/emilk/eframe_template) so you can test your app while you develop.
+2. Develop a [Wasm Component](https://component-model.bytecodealliance.org/) using [cargo-component](https://github.com/bytecodealliance/cargo-component). Create it using `cargo component new --lib <your_plugin_name>`. I like to add a `rustfmt.toml` file with `ignore = ["src/bindings.rs"]` becaus the generated bindings fail the format tests.
+
 ### Testing locally
 
 Make sure you have [`just`](https://just.systems/man/en/) installed and are using the latest version of stable rust by running `rustup update`.
