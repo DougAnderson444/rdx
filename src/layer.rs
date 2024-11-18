@@ -85,6 +85,22 @@ pub fn instantiate_instance<T: Inner>(
         )
         .unwrap();
 
+    // now function
+    host_interface
+        .define_func(
+            "now",
+            Func::new(
+                &mut store,
+                FuncType::new([], [ValueType::S64]),
+                move |_store, _params, results| {
+                    let unix_timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                    results[0] = Value::S64(unix_timestamp);
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
+
     (linker.instantiate(&mut store, &component).unwrap(), store)
 }
 

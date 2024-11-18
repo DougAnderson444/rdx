@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "examples/counter", "examples/login", "examples/random"]
+members = [".", "examples/counter", "examples/datetime", "examples/login", "examples/random"]
 
 [package]
 name = "rdx"
@@ -39,6 +39,7 @@ thiserror = "1"
 wasm_component_layer = "0.1.18"
 wasm_runtime_layer = "0.4"
 rand = "0.8"
+time = "0.3"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
