@@ -1,0 +1,42 @@
+package component:plugin;
+
+interface types {
+  /// The Event type.
+  record event {
+    /// The variable name
+    name: string,
+    value: string
+  }
+}
+
+interface host {
+  use types.{event};
+
+  /// emit an event.
+  emit: func(evt: event);
+
+  /// get a random byte
+  random-byte: func() -> u8;
+}
+
+interface run {
+
+  /// loads just the XML like markdown
+  load: func() -> string;
+
+  /// the random number 
+  random: func() -> list<u8>;
+
+}
+
+/// An example world for the component to target.
+world plugin-world {
+
+  use types.{event};
+
+  /// Import the event handler.
+  import host;
+
+  export run;
+  
+}

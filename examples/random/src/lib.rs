@@ -1,0 +1,71 @@
+#[allow(warnings)]
+mod bindings;
+
+use bindings::component::plugin::host::{emit, random_byte};
+use bindings::component::plugin::types::Event;
+use bindings::exports::component::plugin::run::Guest;
+use getrandom::register_custom_getrandom;
+use std::fmt::Write;
+
+/// Custom function to use the import for random byte generation.
+///
+/// We do this is because "js" feature is incompatible with the component model
+/// if you ever got the __wbindgen_placeholder__ error when trying to use the `js` feature
+/// of getrandom,
+fn imported_random(dest: &mut [u8]) -> Result<(), getrandom::Error> {
+    // iterate over the length of the destination buffer and fill it with random bytes
+    (0..dest.len()).for_each(|i| {
+        dest[i] = random_byte();
+    });
+
+    Ok(())
+}
+
+register_custom_getrandom!(imported_random);
+
+struct Component;
+
+impl Guest for Component {
+    fn load() -> String {
+        r#"
+        // call the system function `render` on the template with the ctx from scope
+        if !is_def_var("number") {
+            render(ctx, `
+                <Vertical>
+                    <Label>Click to generate a Random number</Label>
+                    <Button on_click=random()>Generate</Button>
+                </Vertical>
+            `)
+        } else {
+            render(ctx, `
+                <Vertical>
+                    <Label>Random number is: {{number}}</Label>
+                    <Button on_click=random()>Re-Generate</Button>
+                </Vertical>
+            `)
+        }
+        "#
+        .to_string()
+    }
+
+    // Return the random number
+    fn random() -> Vec<u8> {
+        let mut buf = vec![0u8; 32];
+        getrandom::getrandom(&mut buf).unwrap();
+
+        // converts the vec to a string, use fold and write!() to format the string
+        let value = buf.iter().fold(String::new(), |mut acc, &x| {
+            write!(acc, "{:02x}", x).unwrap();
+            acc
+        });
+
+        emit(&Event {
+            name: "number".to_string(),
+            value,
+        });
+
+        buf
+    }
+}
+
+bindings::export!(Component with_types_in bindings);
