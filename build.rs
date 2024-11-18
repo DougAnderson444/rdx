@@ -12,10 +12,12 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap_or_default();
     let dest_path = Path::new(&out_dir).join("codegen.rs");
 
+    let target = "wasm32-unknown-unknown";
+
     let dir_path = if cfg!(debug_assertions) {
-        "target/wasm32-unknown-unknown/debug"
+        format!("target/{}/debug", target)
     } else {
-        "target/wasm32-unknown-unknown/release"
+        format!("target/{}/release", target)
     };
 
     let project_root = std::env::current_dir().expect("Failed to get current directory");
