@@ -1,5 +1,17 @@
+mod poll;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{Duration, Instant, SystemTime};
+#[cfg(target_arch = "wasm32")]
+use web_time::{Duration, Instant, SystemTime};
+
+use core::future::Future;
+use core::pin::pin;
+use core::task::{Context, Poll};
+pub use poll::Pollable;
 use wasm_component_layer::{
-    Component, Engine, Func, FuncType, Instance, Linker, RecordType, Store, Value, ValueType,
+    Component, Engine, Func, FuncType, Instance, InterfaceIdentifier, Linker, RecordType,
+    ResourceOwn, ResourceType, Store, TypeIdentifier, Value, ValueType,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -13,6 +25,45 @@ use crate::Error;
 pub trait Inner {
     /// Update the state with the given key and value
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
+
+    /// Return the [Pollable] resource
+    fn pollable(&mut self) -> &mut Pollable;
+}
+
+/// The sleep resource
+pub struct Sleep {
+    end: Instant,
+}
+
+#[async_trait::async_trait]
+impl poll::Subscribe for Sleep {
+    async fn ready(&mut self) {
+        #[cfg(not(target_arch = "wasm32"))]
+        tokio::time::sleep_until(self.end.into()).await;
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            send_wrapper::SendWrapper::new(async move {
+                js_sleep(self.end.elapsed().as_millis() as i32)
+                    .await
+                    .unwrap();
+            })
+            .await;
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn js_sleep(millis: i32) -> Result<(), eframe::wasm_bindgen::JsValue> {
+    let promise = web_sys::js_sys::Promise::new(&mut |resolve, _| {
+        web_sys::window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, millis)
+            .unwrap();
+    });
+
+    wasm_bindgen_futures::JsFuture::from(promise).await?;
+    Ok(())
 }
 
 pub fn instantiate_instance<T: Inner>(
@@ -29,6 +80,76 @@ pub fn instantiate_instance<T: Inner>(
     let component = Component::new(&engine, bytes).unwrap();
     // Create a linker that will be used to resolve the component's imports, if any.
     let mut linker = Linker::default();
+
+    // Pollable resource type
+    let pollable_resource_ty = ResourceType::new::<Pollable>(None);
+    let pollable_resource_ty_clone = pollable_resource_ty.clone();
+
+    // pollable is wasi:io/poll
+    let poll_interface = linker
+        .define_instance("wasi:io/poll@0.2.2".try_into().unwrap())
+        .unwrap();
+
+    poll_interface
+        .define_resource("pollable", pollable_resource_ty.clone())
+        .unwrap();
+
+    // ready and block are methods on the pollable resource, "[method]pollable.ready" and "[method]pollable.block"
+    //ready: func() -> bool;
+    poll_interface
+        .define_func(
+            "[method]pollable.ready",
+            Func::new(
+                &mut store,
+                FuncType::new([], [ValueType::Bool]),
+                move |mut store, _params, results| {
+                    let pollable = store.data_mut().pollable();
+                    let ready = (pollable.make_future)(&mut pollable.index);
+
+                    let mut fut = pin!(ready);
+                    let waker = async_runtime_unknown::noop_waker();
+                    let mut cx = Context::from_waker(&waker);
+
+                    // Poll the future once
+                    let poll_result = fut.as_mut().poll(&mut cx);
+
+                    // Check the result
+                    let ready = matches!(poll_result, Poll::Ready(()));
+
+                    results[0] = Value::Bool(ready);
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
+
+    poll_interface
+        .define_func(
+            "[method]pollable.block",
+            Func::new(
+                &mut store,
+                FuncType::new([], []),
+                move |store, params, results| {
+                    todo!();
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
+
+    poll_interface
+        .define_func(
+            "poll",
+            Func::new(
+                &mut store,
+                FuncType::new([ValueType::Own(pollable_resource_ty.clone())], []),
+                move |store, params, results| {
+                    todo!();
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
 
     let host_interface = linker
         .define_instance("component:plugin/host".try_into().unwrap())
@@ -93,8 +214,38 @@ pub fn instantiate_instance<T: Inner>(
                 &mut store,
                 FuncType::new([], [ValueType::S64]),
                 move |_store, _params, results| {
-                    let unix_timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                    let unix_timestamp = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64;
                     results[0] = Value::S64(unix_timestamp);
+                    Ok(())
+                },
+            ),
+        )
+        .unwrap();
+
+    // sleep takes ms and returns a Pollable resource type
+    host_interface
+        .define_func(
+            "sleep",
+            Func::new(
+                &mut store,
+                FuncType::new(
+                    [ValueType::U64],
+                    [ValueType::Own(pollable_resource_ty.clone())],
+                ),
+                move |store, params, results| {
+                    let Value::U64(millis) = params[0] else {
+                        panic!("Incorrect input type.")
+                    };
+                    results[0] = Value::Own(ResourceOwn::new(
+                        store,
+                        Sleep {
+                            end: Instant::now() + Duration::from_millis(millis),
+                        },
+                        pollable_resource_ty.clone(),
+                    )?);
                     Ok(())
                 },
             ),
@@ -148,6 +299,7 @@ mod tests {
     #[derive(Default)]
     struct State {
         count: rhai::Dynamic,
+        pollable: Option<Pollable>,
     }
 
     impl Inner for State {
@@ -159,13 +311,20 @@ mod tests {
                 self.count = value.into();
             }
         }
+
+        fn pollable(&mut self) -> &mut Pollable {
+            self.pollable.as_mut().unwrap()
+        }
     }
 
     #[test]
     fn test_instantiate_instance() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data = State { count: 0.into() };
+        let data = State {
+            count: 0.into(),
+            pollable: None,
+        };
 
         let (instance, mut store) = instantiate_instance(WASM, data);
 
@@ -208,7 +367,10 @@ mod tests {
     fn test_plugin() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data = State { count: 0.into() };
+        let data = State {
+            count: 0.into(),
+            pollable: None,
+        };
 
         let mut plugin = LayerPlugin::new(WASM, data);
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::layer::{Inner, LayerPlugin};
+use crate::layer::{Inner, LayerPlugin, Pollable};
 use crate::pest::{parse, Component};
 use crate::template::TemplatePart;
 
@@ -13,6 +13,7 @@ use wasm_component_layer::Value;
 pub struct State<'a> {
     scope: Scope<'a>,
     egui_ctx: Option<egui::Context>,
+    pollable: Option<Pollable>,
 }
 
 impl<'a> State<'a> {
@@ -20,6 +21,7 @@ impl<'a> State<'a> {
         Self {
             scope,
             egui_ctx: Some(ctx),
+            pollable: None,
         }
     }
 }
@@ -36,6 +38,10 @@ impl Inner for State<'_> {
         } else {
             tracing::warn!("Egui context is not set");
         }
+    }
+
+    fn pollable(&mut self) -> &mut Pollable {
+        todo!()
     }
 }
 
