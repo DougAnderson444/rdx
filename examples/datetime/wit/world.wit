@@ -1,5 +1,7 @@
 package component:plugin;
 
+use wasi:io/poll@0.2.2;
+
 interface types {
   /// The Event type.
   record event {
@@ -11,12 +13,16 @@ interface types {
 
 interface host {
   use types.{event};
+  use poll.{pollable};
 
   /// emit an event.
   emit: func(evt: event);
 
   /// get the unix timestamp
   now: func() -> s64;
+
+  /// Sleep for a number of milliseconds.
+  sleep: func(ms: u64) -> pollable;
 }
 
 interface run {
@@ -27,12 +33,17 @@ interface run {
   /// the current date time
   datetime: func() -> string;
 
+  /// Tick away with each second.
+  ticker: func();
 }
 
 /// An example world for the component to target.
 world plugin-world {
 
   use types.{event};
+
+  /// Import the poll interface.
+  import poll;
 
   /// Import the event handler.
   import host;

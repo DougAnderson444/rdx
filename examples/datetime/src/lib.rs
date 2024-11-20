@@ -1,9 +1,18 @@
+mod reactor;
+use reactor::Reactor;
+
+mod block_on;
+pub use block_on::{block_on, noop_waker};
+
+mod polling;
+
 #[allow(warnings)]
 mod bindings;
 
-use bindings::component::plugin::host::{emit, now};
+use bindings::component::plugin::host::{emit, now, sleep};
 use bindings::component::plugin::types::Event;
 use bindings::exports::component::plugin::run::Guest;
+use bindings::wasi::io::poll::{poll, Pollable};
 
 struct Component;
 
@@ -33,6 +42,20 @@ impl Guest for Component {
         let datetime = now.to_string();
 
         datetime.to_string()
+    }
+
+    /// This function calls now() every second by
+    fn ticker() {
+        block_on(|reactor| async move {
+            // we use sleep to wait for 1 second in between updates to datetime.
+            let pollable = sleep(1000);
+            reactor.wait_for(pollable).await;
+
+            emit(&Event {
+                name: "datetime".to_string(),
+                value: Self::datetime(),
+            });
+        });
     }
 }
 
