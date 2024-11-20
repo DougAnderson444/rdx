@@ -10,7 +10,7 @@ use core::pin::pin;
 use core::task::{Context, Poll};
 pub use poll::Pollable;
 use wasm_component_layer::{
-    Component, Engine, Func, FuncType, Instance, InterfaceIdentifier, Linker, RecordType,
+    Component, Engine, Func, FuncType, Instance, InterfaceIdentifier, Linker, ListType, RecordType,
     ResourceOwn, ResourceType, Store, TypeIdentifier, Value, ValueType,
 };
 
@@ -101,7 +101,10 @@ pub fn instantiate_instance<T: Inner>(
             "[method]pollable.ready",
             Func::new(
                 &mut store,
-                FuncType::new([], [ValueType::Bool]),
+                FuncType::new(
+                    [ValueType::Borrow(pollable_resource_ty.clone())],
+                    [ValueType::Bool],
+                ),
                 move |mut store, _params, results| {
                     let pollable = store.data_mut().pollable();
                     let ready = (pollable.make_future)(&mut pollable.index);
@@ -137,12 +140,18 @@ pub fn instantiate_instance<T: Inner>(
         )
         .unwrap();
 
+    // poll: func(in: list<borrow<pollable>>) -> list<u32>;
     poll_interface
         .define_func(
             "poll",
             Func::new(
                 &mut store,
-                FuncType::new([ValueType::Own(pollable_resource_ty.clone())], []),
+                FuncType::new(
+                    [ValueType::List(ListType::new(ValueType::Borrow(
+                        pollable_resource_ty_clone,
+                    )))],
+                    [ValueType::List(ListType::new(ValueType::U32))],
+                ),
                 move |store, params, results| {
                     todo!();
                     Ok(())
