@@ -5,10 +5,6 @@ edition = "2021"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.35.0", features = ["bitflags"] }
-chrono = { version = "0.4", default-features = false, features = [
-  "alloc",
-  "clock",
-] }
 
 [lib]
 crate-type = ["cdylib"]

@@ -19,7 +19,7 @@ impl Guest for Component {
         // call the system function `render` on the template with the ctx from scope
             render(ctx, `
                 <Vertical>
-                    <Label>Date Time is {{datetime}}</Label>
+                    <Label>Seconds since unix was invented: {{datetime}}</Label>
                 </Vertical>
             `)
         "#
@@ -30,7 +30,7 @@ impl Guest for Component {
         let now = now();
 
         // convert to date time string
-        let datetime = chrono::DateTime::from_timestamp(now, 0).unwrap();
+        let datetime = now.to_string();
 
         datetime.to_string()
     }
