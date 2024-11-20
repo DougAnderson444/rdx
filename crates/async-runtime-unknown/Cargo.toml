@@ -1,0 +1,9 @@
+[package]
+name = "async-runtime-unknown"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm_component_layer = { workspace = true }
+async-trait = "0.1.83"
+slab = "0.4.9"
