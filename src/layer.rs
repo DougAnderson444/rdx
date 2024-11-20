@@ -3,6 +3,11 @@ use wasm_component_layer::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
+use std::time::SystemTime;
+#[cfg(target_arch = "wasm32")]
+use web_time::SystemTime;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub use wasmtime_runtime_layer as runtime_layer;
 
 #[cfg(target_arch = "wasm32")]
@@ -93,7 +98,10 @@ pub fn instantiate_instance<T: Inner>(
                 &mut store,
                 FuncType::new([], [ValueType::S64]),
                 move |_store, _params, results| {
-                    let unix_timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                    let unix_timestamp = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap()
+                        .as_secs() as i64;
                     results[0] = Value::S64(unix_timestamp);
                     Ok(())
                 },

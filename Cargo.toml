@@ -1,5 +1,11 @@
 [workspace]
-members = [".", "examples/counter", "examples/datetime", "examples/login", "examples/random"]
+members = [
+  ".",
+  "examples/counter",
+  "examples/datetime",
+  "examples/login",
+  "examples/random",
+]
 
 [package]
 name = "rdx"
@@ -61,6 +67,7 @@ getrandom = { version = "0.2", features = ["js"] }       # For web builds
 rhai = { version = "1.19", features = ["wasm-bindgen"] }
 js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
+web-time = "1.1.0"
 
 [build-dependencies]
 wasmparser = "0.220"
