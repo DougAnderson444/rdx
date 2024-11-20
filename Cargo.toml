@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.dependencies]
-wasm_component_layer = "0.1.18"
+wasm_component_layer = { git = "https://github.com/DougAnderson444/wasm_component_layer.git", branch = "pollable-mods" }
 async-runtime-unknown = { path = "crates/async-runtime-unknown" }
 
 [package]
@@ -53,6 +53,7 @@ rand = "0.8"
 time = "0.3"
 async-trait = "0.1.83"
 async-runtime-unknown = { workspace = true }
+anyhow = "1.0.93"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

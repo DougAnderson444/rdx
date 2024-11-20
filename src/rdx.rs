@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::layer::{Inner, LayerPlugin, Pollable};
+use crate::layer::{self, Inner, LayerPlugin, Pollable};
 use crate::pest::{parse, Component};
 use crate::template::TemplatePart;
 
@@ -9,11 +9,12 @@ use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct State<'a> {
     scope: Scope<'a>,
     egui_ctx: Option<egui::Context>,
     pollable: Option<Pollable>,
+    table: layer::resource_table::ResourceTable,
 }
 
 impl<'a> State<'a> {
@@ -22,6 +23,7 @@ impl<'a> State<'a> {
             scope,
             egui_ctx: Some(ctx),
             pollable: None,
+            table: Default::default(),
         }
     }
 }
@@ -40,7 +42,7 @@ impl Inner for State<'_> {
         }
     }
 
-    fn pollable(&mut self) -> &mut Pollable {
+    fn table(&mut self) -> &mut layer::resource_table::ResourceTable {
         todo!()
     }
 }

@@ -1,17 +1,22 @@
 mod poll;
+use poll::subscribe;
+
+pub mod resource_table;
+use resource_table::ResourceTable;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant, SystemTime};
 #[cfg(target_arch = "wasm32")]
 use web_time::{Duration, Instant, SystemTime};
 
+use anyhow::bail;
 use core::future::Future;
 use core::pin::pin;
 use core::task::{Context, Poll};
 pub use poll::Pollable;
 use wasm_component_layer::{
-    Component, Engine, Func, FuncType, Instance, InterfaceIdentifier, Linker, ListType, RecordType,
-    ResourceOwn, ResourceType, Store, TypeIdentifier, Value, ValueType,
+    AsContext as _, Component, Engine, Func, FuncType, Instance, Linker, ListType, RecordType,
+    ResourceType, Store, Value, ValueType,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -27,7 +32,7 @@ pub trait Inner {
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
 
     /// Return the [Pollable] resource
-    fn pollable(&mut self) -> &mut Pollable;
+    fn table(&mut self) -> &mut ResourceTable;
 }
 
 /// The sleep resource
@@ -105,9 +110,26 @@ pub fn instantiate_instance<T: Inner>(
                     [ValueType::Borrow(pollable_resource_ty.clone())],
                     [ValueType::Bool],
                 ),
-                move |mut store, _params, results| {
-                    let pollable = store.data_mut().pollable();
-                    let ready = (pollable.make_future)(&mut pollable.index);
+                move |mut store, params, results| {
+                    let Value::Borrow(res) = &params[0] else {
+                        bail!(format!("Incorrect input type, found {:?}", params[0]));
+                    };
+
+                    // need to go from Resource to Pollable type
+                    let index = {
+                        let binding = store.as_context();
+                        let pollable = res.rep::<Pollable, _, _>(&binding).unwrap();
+                        pollable.index
+                    };
+
+                    // this calls .ready() on the inner value (ie. Sleep) which impl Subscribe
+                    // We take Pollable, get the Sleep resource from the index,
+                    // which was saved under index after .push()?
+                    // then get the inner
+                    // from the sleep_resource.
+                    let ctx = store.as_context();
+                    let pollable = res.rep::<&mut Pollable, _, _>(&ctx)?;
+                    let ready = (pollable.make_future)(store.data_mut().table().get_any_mut(index));
 
                     let mut fut = pin!(ready);
                     let waker = async_runtime_unknown::noop_waker();
@@ -244,17 +266,28 @@ pub fn instantiate_instance<T: Inner>(
                     [ValueType::U64],
                     [ValueType::Own(pollable_resource_ty.clone())],
                 ),
-                move |store, params, results| {
+                move |mut store, params, results| {
+                    // sleep should take these millis and turn them into pollable
+                    // then return the pollable
+
                     let Value::U64(millis) = params[0] else {
                         panic!("Incorrect input type.")
                     };
-                    results[0] = Value::Own(ResourceOwn::new(
-                        store,
-                        Sleep {
-                            end: Instant::now() + Duration::from_millis(millis),
-                        },
-                        pollable_resource_ty.clone(),
-                    )?);
+
+                    let sleep = Sleep {
+                        end: Instant::now() + Duration::from_millis(millis),
+                    };
+
+                    let sleep_idx = store.data_mut().table().push(sleep)?;
+
+                    //let table = store.data_mut().table();
+
+                    let pollable_owned = subscribe::<_, Sleep>(&mut store, sleep_idx)?;
+
+                    //let pollable_owned =
+                    //    subscribe(&mut store.data_mut().table(), pollable_resource_ty.clone())?;
+
+                    results[0] = Value::Own(pollable_owned);
                     Ok(())
                 },
             ),
@@ -309,6 +342,7 @@ mod tests {
     struct State {
         count: rhai::Dynamic,
         pollable: Option<Pollable>,
+        table: ResourceTable,
     }
 
     impl Inner for State {
@@ -321,8 +355,8 @@ mod tests {
             }
         }
 
-        fn pollable(&mut self) -> &mut Pollable {
-            self.pollable.as_mut().unwrap()
+        fn table(&mut self) -> &mut resource_table::ResourceTable {
+            &mut self.table
         }
     }
 
@@ -333,6 +367,7 @@ mod tests {
         let data = State {
             count: 0.into(),
             pollable: None,
+            ..Default::default()
         };
 
         let (instance, mut store) = instantiate_instance(WASM, data);
@@ -379,6 +414,7 @@ mod tests {
         let data = State {
             count: 0.into(),
             pollable: None,
+            ..Default::default()
         };
 
         let mut plugin = LayerPlugin::new(WASM, data);

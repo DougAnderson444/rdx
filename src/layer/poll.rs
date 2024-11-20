@@ -1,8 +1,14 @@
+use super::runtime_layer::Engine;
+use crate::layer::runtime_layer;
+use anyhow::Result;
 use std::any::Any;
 use std::future::Future;
 use std::pin::Pin;
 
-use super::ResourceType;
+use wasm_component_layer::{AsContext as _, AsContextMut as _, ResourceOwn, StoreContextMut};
+
+use super::resource_table::ResourceTable;
+use super::{Inner, ResourceType};
 
 pub type PollableFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 pub type MakeFuture = for<'a> fn(&'a mut dyn Any) -> PollableFuture<'a>;
@@ -15,21 +21,16 @@ pub type ClosureFuture = Box<dyn Fn() -> PollableFuture<'static> + Send + 'stati
 /// repeatedly check for readiness of a given condition, e.g. if a stream is readable
 /// or writable. So, rather than containing a Future, which can only become Ready once, a
 /// Pollable contains a way to create a Future in each call to `poll`.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Pollable {
     pub index: u32,
     pub make_future: MakeFuture,
-    //remove_index_on_delete: Option<fn(&mut ResourceTable, u32) -> Result<()>>,
 }
 
 impl Pollable {
     /// Create a new Pollable resource.
     pub fn new(index: u32, make_future: MakeFuture) -> Self {
-        Self {
-            index,
-            make_future,
-            //remove_index_on_delete: None,
-        }
+        Self { index, make_future }
     }
 
     // / Create a new Pollable resource with a custom remove_index_on_delete function.
@@ -84,9 +85,37 @@ pub trait Subscribe: Send + 'static {
 
 pub(crate) fn make_future<'a, T>(stream: &'a mut dyn Any) -> PollableFuture<'a>
 where
-    T: Subscribe,
+    T: Subscribe + Sync,
 {
     stream.downcast_mut::<T>().unwrap().ready()
+}
+
+/// Creates a `pollable` resource which is subscribed to the provided
+/// `resource`.
+///
+pub fn subscribe<T, U>(
+    ctx: &mut StoreContextMut<'_, T, Engine>,
+    resource_index: u32,
+) -> Result<ResourceOwn>
+where
+    T: Inner,
+    U: Subscribe,
+{
+    fn make_future<'a, T>(stream: &'a mut dyn Any) -> PollableFuture<'a>
+    where
+        T: Subscribe,
+    {
+        stream.downcast_mut::<T>().unwrap().ready()
+    }
+
+    let pollable = Pollable {
+        index: resource_index,
+        make_future: make_future::<U>,
+    };
+
+    let pollable_resource = ResourceOwn::new(ctx, pollable, ResourceType::new::<Pollable>(None))?;
+
+    Ok(pollable_resource)
 }
 
 /// The poll function can be called by guest components can submit interest
