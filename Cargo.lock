@@ -1211,7 +1211,9 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 name = "datetime"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-runtime-unknown",
+ "futures",
  "slab",
  "wit-bindgen-rt 0.35.0",
 ]
@@ -1705,6 +1707,7 @@ checksum = "65bc07b1a8bc7c85c5f2e110c476c7389b4554ba72af57d8445ea63a576b0876"
 dependencies = [
  "futures-channel",
  "futures-core",
+ "futures-executor",
  "futures-io",
  "futures-sink",
  "futures-task",
@@ -1726,6 +1729,17 @@ name = "futures-core"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05f29059c0c2090612e8d742178b0580d2dc940c837851ad723096f87af6663e"
+
+[[package]]
+name = "futures-executor"
+version = "0.3.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e28d1d997f585e54aebc3f97d39e72338912123a67330d723fdbb564d646c9f"
+dependencies = [
+ "futures-core",
+ "futures-task",
+ "futures-util",
+]
 
 [[package]]
 name = "futures-io"
@@ -1775,6 +1789,7 @@ version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa08315bb612088cc391249efdc3bc77536f16c91f6cf495e6fbe85b20a4a81"
 dependencies = [
+ "futures-channel",
  "futures-core",
  "futures-io",
  "futures-macro",
@@ -2292,9 +2307,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.12"
+version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a73e9fe3c49d7afb2ace819fa181a287ce54a0983eda4e0eb05c22f82ffe534"
+checksum = "540654e97a3f4470a492cd30ff187bc95d89557a903a2bbf112e2fae98104ef2"
 
 [[package]]
 name = "ittapi"
@@ -3273,6 +3288,7 @@ dependencies = [
  "eframe",
  "egui",
  "env_logger",
+ "futures-lite",
  "getrandom",
  "js_wasm_runtime_layer",
  "log",
@@ -4366,7 +4382,7 @@ dependencies = [
 [[package]]
 name = "wasm_component_layer"
 version = "0.1.18"
-source = "git+https://github.com/DougAnderson444/wasm_component_layer.git?branch=pollable-mods#45ae0474adf28ea9a6cbf58a668fe208779122b0"
+source = "git+https://github.com/DougAnderson444/wasm_component_layer.git?branch=pollable-mods#bc136d22ce9c95000bfc5d3f2849e95428210410"
 dependencies = [
  "anyhow",
  "bytemuck",

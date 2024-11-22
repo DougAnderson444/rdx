@@ -13,7 +13,6 @@ use wasm_component_layer::Value;
 pub struct State<'a> {
     scope: Scope<'a>,
     egui_ctx: Option<egui::Context>,
-    pollable: Option<Pollable>,
     table: layer::resource_table::ResourceTable,
 }
 
@@ -22,7 +21,6 @@ impl<'a> State<'a> {
         Self {
             scope,
             egui_ctx: Some(ctx),
-            pollable: None,
             table: Default::default(),
         }
     }
@@ -42,7 +40,11 @@ impl Inner for State<'_> {
         }
     }
 
-    fn table(&mut self) -> &mut layer::resource_table::ResourceTable {
+    fn table(&self) -> &layer::resource_table::ResourceTable {
+        &self.table
+    }
+
+    fn table_mut(&mut self) -> &mut layer::resource_table::ResourceTable {
         todo!()
     }
 }
@@ -162,7 +164,7 @@ pub fn render_component(
                                 tracing::info!("on_click response {:?}", res);
                             }
                             Err(e) => {
-                                error!("Error {:?}", e);
+                                error!("on_click Error {:?}", e);
                             }
                         }
                     }

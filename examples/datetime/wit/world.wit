@@ -22,7 +22,7 @@ interface host {
   now: func() -> s64;
 
   /// Sleep for a number of milliseconds.
-  sleep: func(ms: u64) -> pollable;
+  subscribe-duration: func(ms: u64) -> pollable;
 }
 
 interface run {
@@ -34,7 +34,7 @@ interface run {
   datetime: func() -> string;
 
   /// Tick away with each second.
-  ticker: func();
+  ticker: func() -> bool;
 }
 
 /// An example world for the component to target.

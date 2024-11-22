@@ -9,7 +9,7 @@ mod polling;
 #[allow(warnings)]
 mod bindings;
 
-use bindings::component::plugin::host::{emit, now, sleep};
+use bindings::component::plugin::host::{emit, now, subscribe_duration};
 use bindings::component::plugin::types::Event;
 use bindings::exports::component::plugin::run::Guest;
 use bindings::wasi::io::poll::{poll, Pollable};
@@ -29,6 +29,7 @@ impl Guest for Component {
             render(ctx, `
                 <Vertical>
                     <Label>Seconds since unix was invented: {{datetime}}</Label>
+                    <Button on_click=ticker()>1s Refresh</Button>
                 </Vertical>
             `)
         "#
@@ -45,10 +46,10 @@ impl Guest for Component {
     }
 
     /// This function calls now() every second by
-    fn ticker() {
+    fn ticker() -> bool {
         block_on(|reactor| async move {
             // we use sleep to wait for 1 second in between updates to datetime.
-            let pollable = sleep(1000);
+            let pollable = subscribe_duration(1000);
             reactor.wait_for(pollable).await;
 
             emit(&Event {
@@ -56,6 +57,8 @@ impl Guest for Component {
                 value: Self::datetime(),
             });
         });
+
+        true
     }
 }
 

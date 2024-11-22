@@ -1,71 +1,69 @@
-use super::runtime_layer::Engine;
-use crate::layer::runtime_layer;
-use anyhow::Result;
+use super::{Resource, ResourceTable};
+use anyhow::{anyhow, Result};
 use std::any::Any;
+use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-
-use wasm_component_layer::{AsContext as _, AsContextMut as _, ResourceOwn, StoreContextMut};
-
-use super::resource_table::ResourceTable;
-use super::{Inner, ResourceType};
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 
 pub type PollableFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 pub type MakeFuture = for<'a> fn(&'a mut dyn Any) -> PollableFuture<'a>;
 pub type ClosureFuture = Box<dyn Fn() -> PollableFuture<'static> + Send + 'static>;
 
-#[derive(Debug)]
 /// A host representation of the `wasi:io/poll.pollable` resource.
 ///
 /// A pollable is not the same thing as a Rust Future: the same pollable may be used to
 /// repeatedly check for readiness of a given condition, e.g. if a stream is readable
 /// or writable. So, rather than containing a Future, which can only become Ready once, a
 /// Pollable contains a way to create a Future in each call to `poll`.
-#[derive(Clone, Copy)]
 pub struct Pollable {
     pub index: u32,
     pub make_future: MakeFuture,
+    remove_index_on_delete: Option<fn(&mut ResourceTable, u32) -> Result<()>>,
 }
 
-impl Pollable {
-    /// Create a new Pollable resource.
-    pub fn new(index: u32, make_future: MakeFuture) -> Self {
-        Self { index, make_future }
-    }
-
-    // / Create a new Pollable resource with a custom remove_index_on_delete function.
-    // pub fn new_with_remove_index_on_delete(
-    //     index: u32,
-    //     make_future: MakeFuture,
-    //     remove_index_on_delete: fn(&mut ResourceTable, u32) -> Result<()>,
-    // ) -> Self {
-    //     Self {
-    //         index,
-    //         make_future,
-    //         remove_index_on_delete: Some(remove_index_on_delete),
-    //     }
-    // }
-
-    /// Get the index of the Pollable.
-    pub fn index(&self) -> u32 {
-        self.index
-    }
-
-    /// Create a new Future for the Pollable.
-    pub fn make_future(&mut self) -> PollableFuture<'_> {
-        (self.make_future)(self)
-    }
-
-    // /// Remove the Pollable from the ResourceTable.
-    // pub fn remove_index_on_delete(&mut self, resource_table: &mut ResourceTable) -> Result<()> {
-    //     if let Some(remove_index_on_delete) = self.remove_index_on_delete {
-    //         remove_index_on_delete(resource_table, self.index)
-    //     } else {
-    //         Ok(())
-    //     }
-    // }
-}
-
+/// A trait used internally within a [`Pollable`] to create a `pollable`
+/// resource in `wasi:io/poll`.
+///
+/// This trait is the internal implementation detail of any pollable resource in
+/// this crate's implementation of WASI. The `ready` function is an `async fn`
+/// which resolves when the implementation is ready. Using native `async` Rust
+/// enables this type's readiness to compose with other types' readiness
+/// throughout the WASI implementation.
+///
+/// This trait is used in conjunction with [`subscribe`] to create a `pollable`
+/// resource.
+///
+/// # Example
+///
+/// This is a simple example of creating a `Pollable` resource from a few
+/// parameters.
+///
+/// ```
+/// use tokio::time::{self, Duration, Instant};
+/// use wasmtime_wasi::{WasiView, Subscribe, subscribe, Pollable, async_trait};
+/// use wasmtime::component::Resource;
+/// use wasmtime::Result;
+///
+/// fn sleep(cx: &mut dyn WasiView, dur: Duration) -> Result<Resource<Pollable>> {
+///     let end = Instant::now() + dur;
+///     let sleep = MySleep { end };
+///     let sleep_resource = cx.table().push(sleep)?;
+///     subscribe(cx.table(), sleep_resource)
+/// }
+///
+/// struct MySleep {
+///     end: Instant,
+/// }
+///
+/// #[async_trait]
+/// impl Subscribe for MySleep {
+///     async fn ready(&mut self) {
+///         tokio::time::sleep_until(self.end).await;
+///     }
+/// }
+/// ```
 #[async_trait::async_trait]
 pub trait Subscribe: Send + 'static {
     /// An asynchronous function which resolves when this object's readiness
@@ -83,23 +81,19 @@ pub trait Subscribe: Send + 'static {
     async fn ready(&mut self);
 }
 
-pub(crate) fn make_future<'a, T>(stream: &'a mut dyn Any) -> PollableFuture<'a>
-where
-    T: Subscribe + Sync,
-{
-    stream.downcast_mut::<T>().unwrap().ready()
-}
-
 /// Creates a `pollable` resource which is subscribed to the provided
 /// `resource`.
 ///
-pub fn subscribe<T, U>(
-    ctx: &mut StoreContextMut<'_, T, Engine>,
-    resource_index: u32,
-) -> Result<ResourceOwn>
+/// If `resource` is an owned resource then it will be deleted when the returned
+/// resource is deleted. Otherwise the returned resource is considered a "child"
+/// of the given `resource` which means that the given resource cannot be
+/// deleted while the `pollable` is still alive.
+pub fn subscribe<T>(
+    table: Arc<Mutex<ResourceTable>>,
+    resource: Resource<T>,
+) -> Result<Resource<Pollable>>
 where
-    T: Inner,
-    U: Subscribe,
+    T: Subscribe,
 {
     fn make_future<'a, T>(stream: &'a mut dyn Any) -> PollableFuture<'a>
     where
@@ -109,18 +103,18 @@ where
     }
 
     let pollable = Pollable {
-        index: resource_index,
-        make_future: make_future::<U>,
+        index: resource.rep(),
+        remove_index_on_delete: if resource.owned() {
+            Some(|table, idx| {
+                let resource = Resource::<T>::new_own(idx);
+                table.delete(resource)?;
+                Ok(())
+            })
+        } else {
+            None
+        },
+        make_future: make_future::<T>,
     };
 
-    let pollable_resource = ResourceOwn::new(ctx, pollable, ResourceType::new::<Pollable>(None))?;
-
-    Ok(pollable_resource)
-}
-
-/// The poll function can be called by guest components can submit interest
-/// in an operation to the host system. List the `pollables: Vec<Resource<Pollable>>`
-/// that the guest is interested in, and the host will return a list of Readylist Index.
-pub fn poll(pollables: Vec<Pollable>) -> Result<Vec<u32>, Box<dyn std::error::Error>> {
-    todo!()
+    Ok(table.lock().unwrap().push_child(pollable, &resource)?)
 }

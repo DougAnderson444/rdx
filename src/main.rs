@@ -3,7 +3,8 @@
 
 // When compiling natively:
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> eframe::Result {
+#[tokio::main]
+async fn main() -> eframe::Result {
     let _ = tracing_subscriber::fmt()
         .with_env_filter("rdx=trace")
         .try_init();

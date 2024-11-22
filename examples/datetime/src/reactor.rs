@@ -1,11 +1,14 @@
+use crate::bindings::wasi::io::poll::poll;
+
 use super::Pollable;
 
 use super::polling::{EventKey, Poller};
 
 use std::collections::HashMap;
-use std::future;
-use std::task::Poll;
+use std::future::{self, Future};
+use std::pin::Pin;
 use std::task::Waker;
+use std::task::{Context, Poll};
 use std::{cell::RefCell, rc::Rc};
 
 /// Manage async system resources for WASI 0.1
@@ -63,6 +66,29 @@ impl Reactor {
         .await
     }
 
+    pub fn await_on(&self, pollable: Pollable) -> impl Future<Output = ()> {
+        let inner = self.inner.clone();
+        async move {
+            let mut pollable = Some(pollable);
+            let mut key = None;
+            future::poll_fn(|cx| {
+                let mut reactor = inner.borrow_mut();
+                let key =
+                    key.get_or_insert_with(|| reactor.poller.insert(pollable.take().unwrap()));
+                reactor.wakers.insert(*key, cx.waker().clone());
+
+                if reactor.poller.get(key).unwrap().ready() {
+                    reactor.poller.remove(*key);
+                    reactor.wakers.remove(key);
+                    Poll::Ready(())
+                } else {
+                    Poll::Pending
+                }
+            })
+            .await
+        }
+    }
+
     /// Reactor wrapper for inner poller to block until new events are ready.
     /// Calls the respective wakers once done.
     pub(crate) fn block_until(&self) {
@@ -72,6 +98,31 @@ impl Reactor {
                 Some(waker) => waker.wake_by_ref(),
                 None => panic!("tried to wake the waker for non-existent `{key:?}`"),
             }
+        }
+    }
+}
+
+/// Turn a single pollable into a future.
+pub struct PollableFuture {
+    pollable: Pollable,
+}
+
+impl PollableFuture {
+    /// Create a new instance of `PollableFuture`
+    pub(crate) fn new(pollable: Pollable) -> Self {
+        Self { pollable }
+    }
+}
+
+impl Future for PollableFuture {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.pollable.ready() {
+            Poll::Ready(())
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
         }
     }
 }
