@@ -38,12 +38,6 @@ use crate::Error;
 pub trait Inner {
     /// Update the state with the given key and value
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
-
-    /// A ResourceTable to track resources across all instances
-    fn table(&self) -> &resource_table::ResourceTable;
-
-    /// A ResourceTable to track resources across all instances
-    fn table_mut(&mut self) -> &mut resource_table::ResourceTable;
 }
 
 /// The sleep resource
@@ -89,7 +83,7 @@ pub async fn js_sleep(millis: i32) -> Result<(), eframe::wasm_bindgen::JsValue> 
 
 enum Deadline {
     Past,
-    Instant(tokio::time::Instant),
+    Instant(Instant),
     Never,
 }
 
@@ -98,7 +92,21 @@ impl Subscribe for Deadline {
     async fn ready(&mut self) {
         match self {
             Deadline::Past => {}
-            Deadline::Instant(instant) => tokio::time::sleep_until(*instant).await,
+            Deadline::Instant(instant) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    tokio::time::sleep_until((*instant).into()).await;
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    send_wrapper::SendWrapper::new(async move {
+                        js_sleep(instant.elapsed().as_millis() as i32)
+                            .await
+                            .unwrap();
+                    })
+                    .await;
+                }
+            }
             Deadline::Never => std::future::pending().await,
         }
     }
@@ -258,20 +266,28 @@ impl Layer {
 
                         type ReadylistIndex = u32;
 
+                        tracing::debug!("[poll]: convert list to pollables");
+
                         let pollables = match &params[0] {
                             Value::List(pollables) => pollables,
                             _ => bail!("Incorrect input type"),
                         };
 
+                        tracing::debug!("[poll]: check if pollables is empty");
+
                         if pollables.is_empty() {
                             bail!("Empty pollables list");
                         }
+
+                        tracing::debug!("[poll]: create table futures");
 
                         let mut table_futures: HashMap<u32, (MakeFuture, Vec<ReadylistIndex>)> =
                             HashMap::new();
 
                         for (ix, p) in pollables.iter().enumerate() {
                             let ix: u32 = ix.try_into()?;
+
+                            tracing::debug!("[poll]: get pollable resource");
 
                             let Value::Borrow(pollable_resource) = p else {
                                 bail!("Incorrect input type, found {:?}", p);
@@ -338,6 +354,8 @@ impl Layer {
                             }
                         }
 
+                        tracing::debug!("[poll]: return poll list");
+
                         // We set results[0] to be the sync equivalent to: PollList { futures }.await
                         results[0] = Value::List(List::new(
                             ListType::new(ValueType::U32),
@@ -376,6 +394,23 @@ impl Layer {
         .unwrap();
         let params = ValueType::Record(record);
         let results = [];
+
+        // "log" function using tracing
+        host_interface
+            .define_func(
+                "log",
+                Func::new(
+                    &mut store,
+                    FuncType::new([ValueType::String], []),
+                    move |_store, params, _results| {
+                        if let Value::String(s) = &params[0] {
+                            tracing::info!("{}", s);
+                        }
+                        Ok(())
+                    },
+                ),
+            )
+            .unwrap();
 
         host_interface
             .define_func(
@@ -499,7 +534,7 @@ impl<T: Inner + 'static> LayerPlugin<T> {
     }
 
     /// Calls the given function name with the given parameters
-    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Value, Error> {
+    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error> {
         let export_instance = self
             .raw_instance
             .exports()
@@ -510,15 +545,20 @@ impl<T: Inner + 'static> LayerPlugin<T> {
             .func(name)
             .ok_or_else(|| Error::FuncNotFound(name.to_string()))?;
 
-        const CAPACITY: usize = 1;
-        let mut results = [Value::Bool(false); CAPACITY];
+        let func_result_len = func.ty().results().len();
+        let mut results = vec![Value::Bool(false); func_result_len];
+
         func.call(&mut self.store, arguments, &mut results)
             .map_err(|e| {
                 tracing::error!("Error calling function: {:?}", e);
                 e
             })?;
 
-        Ok(results[0].clone())
+        if results.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(results.remove(0)))
+        }
     }
 }
 
@@ -542,14 +582,6 @@ mod tests {
             if key == "count" {
                 self.count = value.into();
             }
-        }
-
-        fn table_mut(&mut self) -> &mut resource_table::ResourceTable {
-            &mut self.table
-        }
-
-        fn table(&self) -> &resource_table::ResourceTable {
-            &self.table
         }
     }
 
@@ -613,7 +645,7 @@ mod tests {
         let _ = plugin.call("increment", &[]).unwrap();
 
         // current
-        let result = plugin.call("current", &[]).unwrap();
+        let result = plugin.call("current", &[]).unwrap().unwrap();
 
         assert_eq!(result, Value::S32(1));
     }

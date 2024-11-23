@@ -39,14 +39,6 @@ impl Inner for State<'_> {
             tracing::warn!("Egui context is not set");
         }
     }
-
-    fn table(&self) -> &layer::resource_table::ResourceTable {
-        &self.table
-    }
-
-    fn table_mut(&mut self) -> &mut layer::resource_table::ResourceTable {
-        todo!()
-    }
 }
 
 /// The details of a plugin
@@ -250,11 +242,11 @@ pub fn render_component(
                                         .collect::<Vec<_>>();
                                     if let Ok(value) = lock.call(on_change, args.as_slice()) {
                                         match value {
-                                            Value::String(_s) => {
+                                            Some(Value::String(_s)) => {
                                                 // TODO: set the scope variable to the returned value of on_change fn?
                                                 // scope.set_or_push(var_name.as_str(), s);
                                             }
-                                            Value::Bool(_) => {}
+                                            Some(Value::Bool(_)) => {}
                                             _ => {}
                                         }
                                     } else {
@@ -303,7 +295,7 @@ impl RdxApp {
 
             let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone(), scope.clone()));
             let rdx_source = plugin.call("load", &[]).unwrap();
-            let Value::String(rdx_source) = rdx_source else {
+            let Some(Value::String(rdx_source)) = rdx_source else {
                 panic!("RDX Source should be a string");
             };
             plugins.insert(
