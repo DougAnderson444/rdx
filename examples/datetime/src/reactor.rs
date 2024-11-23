@@ -37,49 +37,21 @@ impl Reactor {
     }
 
     /// Wait for the pollable to resolve.
-    pub async fn wait_for(&self, pollable: Pollable) {
+    pub fn wait_for(&self, pollable: Pollable) -> impl Future<Output = ()> + '_ {
         let mut pollable = Some(pollable);
-        let mut key = None;
-
-        // This function is the core loop of our function; it will be called
-        // multiple times as the future is resolving.
-        future::poll_fn(|cx| {
-            // Start by taking a lock on the reactor. This is single-threaded
-            // and short-lived, so it will never be contended.
-            let mut reactor = self.inner.borrow_mut();
-
-            // Schedule interest in the `pollable` on the first iteration. On
-            // every iteration, register the waker with the reactor.
-            let key = key.get_or_insert_with(|| reactor.poller.insert(pollable.take().unwrap()));
-            reactor.wakers.insert(*key, cx.waker().clone());
-
-            // Check whether we're ready or need to keep waiting. If we're
-            // ready, we clean up after ourselves.
-            if reactor.poller.get(key).unwrap().ready() {
-                reactor.poller.remove(*key);
-                reactor.wakers.remove(key);
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        })
-        .await
-    }
-
-    pub fn await_on(&self, pollable: Pollable) -> impl Future<Output = ()> {
-        let inner = self.inner.clone();
         async move {
-            let mut pollable = Some(pollable);
             let mut key = None;
             future::poll_fn(|cx| {
-                let mut reactor = inner.borrow_mut();
-                let key =
-                    key.get_or_insert_with(|| reactor.poller.insert(pollable.take().unwrap()));
-                reactor.wakers.insert(*key, cx.waker().clone());
+                let mut reactor = self.inner.borrow_mut();
+                if key.is_none() {
+                    key = Some(reactor.poller.insert(pollable.take().unwrap()));
+                }
+                let k = key.unwrap();
+                reactor.wakers.insert(k, cx.waker().clone());
 
-                if reactor.poller.get(key).unwrap().ready() {
-                    reactor.poller.remove(*key);
-                    reactor.wakers.remove(key);
+                if reactor.poller.get(&k).unwrap().ready() {
+                    reactor.poller.remove(k);
+                    reactor.wakers.remove(&k);
                     Poll::Ready(())
                 } else {
                     Poll::Pending
