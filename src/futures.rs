@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::future::Future;
 
 #[cfg(not(target_arch = "wasm32"))]

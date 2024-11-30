@@ -31,11 +31,6 @@ use wasm_component_layer::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant, SystemTime};
-#[cfg(target_arch = "wasm32")]
-use web_time::{Duration, Instant, SystemTime};
-
-#[cfg(not(target_arch = "wasm32"))]
 pub use wasmtime_runtime_layer as runtime_layer;
 
 #[cfg(target_arch = "wasm32")]
@@ -417,21 +412,17 @@ impl Layer {
             )
             .unwrap();
 
-    // now function
-    host_interface
-        .define_func(
-            "now",
-            Func::new(
-                &mut store,
-                FuncType::new([], [ValueType::S64]),
-                move |_store, _params, results| {
-                    let unix_timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-                    results[0] = Value::S64(unix_timestamp);
-                    Ok(())
-                },
-            ),
-        )
-        .unwrap();
+        host_interface
+            .define_func(
+                "emit",
+                Func::new(
+                    &mut store,
+                    FuncType::new([params], results),
+                    move |mut store, params, _results| {
+                        tracing::info!("Emitting event {:?}", params);
+                        if let Value::Record(record) = &params[0] {
+                            let name = record.field("name").unwrap();
+                            let value = record.field("value").unwrap();
 
                             if let Value::String(name) = name {
                                 if let Value::String(value) = value {
@@ -647,7 +638,7 @@ mod tests {
         let _ = plugin.call("increment", &[]).unwrap();
 
         // current
-        let result = plugin.call("current", &[]).unwrap().unwrap();
+        let result = plugin.call("current", &[]).unwrap();
 
         assert_eq!(result, Some(Value::S32(1)));
     }

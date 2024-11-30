@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::futures;
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
 use crate::template::TemplatePart;
@@ -9,6 +8,11 @@ use crate::template::TemplatePart;
 use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::SystemTime;
+#[cfg(target_arch = "wasm32")]
+use web_time::SystemTime;
 
 #[derive(Debug, Clone)]
 pub struct State<'a> {
@@ -147,14 +151,9 @@ impl PluginDeets {
         };
 
         // sif self ctx is None, set it and call register(). This is a one-time thing
-        match self.ctx {
-            Some(_) => {
-                //self.ctx = Some(ctx.clone());
-            }
-            None => {
-                self.ctx = Some(ctx.clone());
-                self.register_fn();
-            }
+        if self.ctx.is_none() {
+            self.ctx = Some(ctx.clone());
+            self.register_fn();
         }
 
         if let Some(ast) = &self.ast {
@@ -375,10 +374,6 @@ impl RdxApp {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::layer::LayerPlugin;
-    use crate::pest::parse;
-    use crate::template::TemplatePart;
-    use rhai::Dynamic;
 
     // test calling a tick() function in the rhai script
     #[test]
