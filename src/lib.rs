@@ -2,7 +2,7 @@
 
 // The build file results
 // Build files are for the demos, so the wasm binaries can be included by default in the build
-include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+include!(concat!(env!("OUT_DIR"), "/builtin_components.rs"));
 
 mod app;
 pub use app::TemplateApp;

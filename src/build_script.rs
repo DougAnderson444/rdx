@@ -14,16 +14,16 @@ use std::path::PathBuf;
 /// }
 /// ```
 ///
-/// then add codegen.rs to your lib.rs or main.rs:
+/// then add builtin_components.rs to your lib.rs or main.rs:
 ///
 /// # Example
 ///
 /// ```ignore
-/// include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+/// include!(concat!(env!("OUT_DIR"), "/builtin_components.rs"));
 /// ```
 pub fn build_script() {
     let out_dir = env::var_os("OUT_DIR").unwrap_or_default();
-    let dest_path = Path::new(&out_dir).join("codegen.rs");
+    let dest_path = Path::new(&out_dir).join("builtin_components.rs");
 
     let target = "wasm32-unknown-unknown";
 

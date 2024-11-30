@@ -3,14 +3,18 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-/// Uses wasmparser to determine if parsed bytes Payload version is Encoding::Component
-fn is_component(bytes: &[u8]) -> bool {
-    wasmparser::Parser::is_component(bytes)
-}
-
+/// Build script to include any wasm component binaries in the build.
+///
+/// Add builtin_components.rs to your lib.rs or main.rs:
+///
+/// # Example
+///
+/// ```ignore
+/// include!(concat!(env!("OUT_DIR"), "/builtin_components.rs"));
+/// ```
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap_or_default();
-    let dest_path = Path::new(&out_dir).join("codegen.rs");
+    let dest_path = Path::new(&out_dir).join("builtin_components.rs");
 
     let target = "wasm32-unknown-unknown";
 
@@ -38,7 +42,7 @@ fn main() {
                         };
                         ext == "wasm"
                             && *path.file_stem().unwrap() != *this_root_crate
-                            && is_component(&bytes)
+                            && wasmparser::Parser::is_component(&bytes)
                     })
                     .map(|_| path.to_path_buf())
             })
