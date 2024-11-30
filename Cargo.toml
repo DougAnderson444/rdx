@@ -1,5 +1,11 @@
 [workspace]
-members = [".", "examples/counter", "examples/datetime", "examples/login", "examples/random"]
+members = [
+  ".",
+  "examples/counter",
+  "examples/datetime",
+  "examples/login",
+  "examples/random",
+]
 
 [package]
 name = "rdx"
@@ -36,7 +42,7 @@ pest_derive = "2.7.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
-wasm_component_layer = { workspace = true }
+wasm_component_layer = "0.1.18"
 wasm_runtime_layer = "0.4"
 rand = "0.8"
 time = "0.3"

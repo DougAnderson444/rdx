@@ -4371,7 +4371,8 @@ dependencies = [
 [[package]]
 name = "wasm_component_layer"
 version = "0.1.18"
-source = "git+https://github.com/DougAnderson444/wasm_component_layer.git?branch=pollable-mods#bc136d22ce9c95000bfc5d3f2849e95428210410"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a1f3d593ddf0aa7aa1bfd6a133caf1533e349afad720417f0e12873ef46a7c7"
 dependencies = [
  "anyhow",
  "bytemuck",
