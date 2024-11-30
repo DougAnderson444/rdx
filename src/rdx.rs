@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::futures;
 use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
 use crate::template::TemplatePart;
@@ -8,11 +9,6 @@ use crate::template::TemplatePart;
 use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
-
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant, SystemTime};
-#[cfg(target_arch = "wasm32")]
-use web_time::{Duration, Instant, SystemTime};
 
 #[derive(Debug, Clone)]
 pub struct State<'a> {
@@ -123,7 +119,7 @@ impl PluginDeets {
                     // parse it once then store it in a cache for each RDX string?
                     // use std::cell::LazyCell (or LazyLock for sync)
                     if let Ok(components) = parse(text) {
-                        render_component(ui, &components, plugin_clone.clone());
+                        render_component(ui, components, plugin_clone.clone());
                     }
                 });
         });
@@ -177,7 +173,7 @@ impl PluginDeets {
 /// Render the components of this plugin
 pub fn render_component(
     ui: &mut egui::Ui,
-    components: &Vec<Component>,
+    components: Vec<Component>,
     plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
 ) {
     for component in components {
@@ -222,7 +218,7 @@ pub fn render_component(
                                 tracing::info!("on_click response {:?}", res);
                             }
                             Err(e) => {
-                                error!("Error {:?}", e);
+                                error!("on_click Error {:?}", e);
                             }
                         }
                     }

@@ -1,11 +1,5 @@
 [workspace]
-members = [
-  ".",
-  "examples/counter",
-  "examples/datetime",
-  "examples/login",
-  "examples/random",
-]
+members = [".", "examples/counter", "examples/datetime", "examples/login", "examples/random"]
 
 [package]
 name = "rdx"
@@ -42,11 +36,13 @@ pest_derive = "2.7.14"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1"
-wasm_component_layer = "0.1.18"
+wasm_component_layer = { workspace = true }
 wasm_runtime_layer = "0.4"
 rand = "0.8"
 time = "0.3"
-
+async-trait = "0.1.83"
+anyhow = "1.0.93"
+futures-lite = "2.5.0"
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -58,15 +54,17 @@ wasi-common = { version = "25.0.1", features = ["tokio"] }
 wasm-compose = "0.219.1"
 wasmparser = "0.219.1"
 wasmtime_runtime_layer = "26.0.0"
+tokio = { version = "1", features = ["full"] }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
-web-sys = "0.3.70"                                       # to access the DOM (to hide the loading text)
-getrandom = { version = "0.2", features = ["js"] }       # For web builds
+web-sys = "0.3.70"                                           # to access the DOM (to hide the loading text)
+getrandom = { version = "0.2", features = ["js"] }           # For web builds
 rhai = { version = "1.19", features = ["wasm-bindgen"] }
 js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
+send_wrapper = { version = "0.6.0", features = ["futures"] }
 web-time = "1.1.0"
 
 [build-dependencies]
@@ -84,9 +82,7 @@ opt-level = 2 # fast and small wasm
 [profile.dev.package."*"]
 opt-level = 2
 
-
 [patch.crates-io]
-
 # If you want to use the bleeding edge version of egui and eframe:
 # egui = { git = "https://github.com/emilk/egui", branch = "master" }
 # eframe = { git = "https://github.com/emilk/egui", branch = "master" }
