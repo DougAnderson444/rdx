@@ -17,7 +17,7 @@ impl Guest for Component {
 
         r#"
         // call the system function `render` on the template with the ctx from scope
-            render(ctx, `
+            render(`
                 <Vertical>
                     <Label>Seconds since unix was invented: {{datetime}}</Label>
                 </Vertical>

@@ -219,18 +219,18 @@ macro_rules! __export_plugin_world_impl {
 #[doc(inline)]
 pub(crate) use __export_plugin_world_impl as export;
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.30.0:plugin-world:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.35.0:component:plugin:plugin-world:encoded world"]
 #[doc(hidden)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 395] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x88\x02\x01A\x02\x01\
-A\x08\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\x01\x16com\
-ponent:plugin/types\x05\0\x02\x03\0\0\x05event\x01B\x06\x02\x03\x02\x01\x01\x04\0\
-\x05event\x03\0\0\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\x02\x01@\0\0}\x04\0\
-\x0brandom-byte\x01\x03\x03\x01\x15component:plugin/host\x05\x02\x03\0\x05event\x03\
-\0\x01\x01B\x05\x01@\0\0s\x04\0\x04load\x01\0\x01p}\x01@\0\0\x01\x04\0\x06random\
-\x01\x02\x04\x01\x14component:plugin/run\x05\x04\x04\x01\x1dcomponent:plugin/plu\
-gin-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cpro\
-cessed-by\x02\x0dwit-component\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+A\x08\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\0\x16compo\
+nent:plugin/types\x05\0\x02\x03\0\0\x05event\x03\0\x05event\x03\0\x01\x01B\x06\x02\
+\x03\x02\x01\x01\x04\0\x05event\x03\0\0\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\
+\x02\x01@\0\0}\x04\0\x0brandom-byte\x01\x03\x03\0\x15component:plugin/host\x05\x03\
+\x01B\x05\x01@\0\0s\x04\0\x04load\x01\0\x01p}\x01@\0\0\x01\x04\0\x06random\x01\x02\
+\x04\0\x14component:plugin/run\x05\x04\x04\0\x1dcomponent:plugin/plugin-world\x04\
+\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\
+\x0dwit-component\x070.220.0\x10wit-bindgen-rust\x060.35.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

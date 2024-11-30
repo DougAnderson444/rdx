@@ -47,7 +47,7 @@ impl Guest for Component {
     fn load() -> String {
         r#"
         // call the system function `render` on the template with the ctx from scope
-        render(ctx, `
+        render(`
             <Vertical>
                 <TextEdit on_change=username(username)>{{username}}</TextEdit>
                 <TextEdit on_change=password(password)>{{password}}</TextEdit>

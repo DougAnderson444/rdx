@@ -37,7 +37,7 @@ impl Guest for Counter {
 
         if !is_def_var("count") || count == "0" {
 
-            render(ctx, `
+            render(`
                 <Vertical>
                     <Button on_click=increment()>Increment</Button>
                     <Button on_click=decrement()>Decrement</Button>
@@ -47,7 +47,7 @@ impl Guest for Counter {
 
         } else {
 
-            render(ctx, `
+            render(`
                 <Vertical>
                     <Button on_click=increment()>Increment</Button>
                     <Button on_click=decrement()>Decrement</Button>

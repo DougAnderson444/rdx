@@ -31,14 +31,14 @@ impl Guest for Component {
         r#"
         // call the system function `render` on the template with the ctx from scope
         if !is_def_var("number") {
-            render(ctx, `
+            render(`
                 <Vertical>
                     <Label>Click to generate a Random number</Label>
                     <Button on_click=random()>Generate</Button>
                 </Vertical>
             `)
         } else {
-            render(ctx, `
+            render(`
                 <Vertical>
                     <Label>Random number is: {{number}}</Label>
                     <Button on_click=random()>Re-Generate</Button>
