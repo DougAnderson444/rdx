@@ -4,8 +4,8 @@ on: [push, pull_request, workflow_dispatch]
 name: CI Rust Workflow
 
 env:
-  RUSTFLAGS: -D warnings
-  RUSTDOCFLAGS: -D warnings
+  RUSTFLAGS: -D warnings -A static_mut_refs
+  RUSTDOCFLAGS: -D warnings -A static_mut_refs
 
 permissions:
   actions: read
