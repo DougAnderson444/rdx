@@ -1,1 +1,5 @@
 [build]
+
+[serve]
+# Trunk's dev server will look for the index.html file in this folder
+dir = "dist"
