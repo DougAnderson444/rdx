@@ -1,6 +1,7 @@
 #![warn(clippy::all)]
 
 // The build file results
+// Build files are for the demos, so the wasm binaries can be included by default in the build
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 mod app;
