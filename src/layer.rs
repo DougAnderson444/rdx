@@ -3,9 +3,9 @@ use wasm_component_layer::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 #[cfg(target_arch = "wasm32")]
-use web_time::SystemTime;
+use web_time::{Duration, Instant, SystemTime};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use wasmtime_runtime_layer as runtime_layer;
@@ -130,7 +130,7 @@ impl<T: Inner> LayerPlugin<T> {
     }
 
     /// Calls the given function name with the given parameters
-    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Value, Error> {
+    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error> {
         let export_instance = self
             .raw_instance
             .exports()
@@ -141,11 +141,20 @@ impl<T: Inner> LayerPlugin<T> {
             .func(name)
             .ok_or_else(|| Error::FuncNotFound(name.to_string()))?;
 
-        const CAPACITY: usize = 1;
-        let mut results = [Value::Bool(false); CAPACITY];
-        func.call(&mut self.store, arguments, &mut results)?;
+        let func_result_len = func.ty().results().len();
+        let mut results = vec![Value::Bool(false); func_result_len];
 
-        Ok(results[0].clone())
+        func.call(&mut self.store, arguments, &mut results)
+            .map_err(|e| {
+                tracing::error!("Error calling function: {:?}", e);
+                e
+            })?;
+
+        if results.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(results.remove(0)))
+        }
     }
 }
 
@@ -225,6 +234,6 @@ mod tests {
         // current
         let result = plugin.call("current", &[]).unwrap();
 
-        assert_eq!(result, Value::S32(1));
+        assert_eq!(result, Some(Value::S32(1)));
     }
 }
