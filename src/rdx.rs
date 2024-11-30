@@ -9,6 +9,11 @@ use rhai::{Dynamic, Scope};
 use tracing::error;
 use wasm_component_layer::Value;
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::{Duration, Instant, SystemTime};
+#[cfg(target_arch = "wasm32")]
+use web_time::{Duration, Instant, SystemTime};
+
 #[derive(Debug, Clone)]
 pub struct State<'a> {
     scope: Scope<'a>,
@@ -41,25 +46,75 @@ impl Inner for State<'_> {
 
 /// The details of a plugin
 pub struct PluginDeets {
+    name: String,
     /// Reference counted so we can pass it into the rhai engine closure
     pub plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
     // Could be here for display purposes only, once it's compiled we're done using it.
     // rdx_source: String,
     engine: rhai::Engine,
     ast: Option<rhai::AST>,
+    ctx: Option<egui::Context>,
 }
 
 impl PluginDeets {
     fn new(name: String, plugin: LayerPlugin<State<'static>>, rdx_source: String) -> Self {
-        let mut engine = rhai::Engine::new();
-
+        let engine = rhai::Engine::new();
         let plugin = Arc::new(Mutex::new(plugin));
-        let plugin_clone = plugin.clone();
-        let id = name.to_string();
 
-        engine.register_fn("render", move |ctx: egui::Context, text: &str| {
+        //engine.register_fn("render", move |ctx: egui::Context, text: &str| {
+        //    // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
+        //    egui::Window::new(id.clone())
+        //        .resizable(true)
+        //        .show(&ctx, |ui| {
+        //            // dilemma here is: do you re-parse the RDX every time you render?
+        //            // if it's parsed once, where is the Component stored?
+        //            // and How do we refer to it?
+        //            // parse it once then store it in a cache for each RDX string?
+        //            // use std::cell::LazyCell (or LazyLock for sync)
+        //            if let Ok(components) = parse(text) {
+        //                render_component(ui, &components, plugin_clone.clone());
+        //            }
+        //        });
+        //});
+        //
+        //// also regietr in rhai a "now" function to get unix time in seconds
+        //engine.register_fn("now", || {
+        //    let unix_timestamp = SystemTime::now()
+        //        .duration_since(SystemTime::UNIX_EPOCH)
+        //        .unwrap()
+        //        .as_secs() as i64;
+        //    Dynamic::from(unix_timestamp)
+        //});
+
+        let ast = match engine.compile(&rdx_source) {
+            Ok(ast) => Some(ast),
+            Err(e) => {
+                tracing::error!("Failed to compile RDX source: {:?}", e);
+                None
+            }
+        };
+
+        Self {
+            name,
+            plugin,
+            engine,
+            ast,
+            ctx: None,
+        }
+    }
+
+    /// Registers functions in the rhai Engine
+    pub fn register_fn(&mut self) {
+        let plugin_clone = self.plugin.clone();
+        let name = self.name.clone();
+        let Some(ctx) = self.ctx.clone() else {
+            tracing::warn!("Egui context is not set");
+            return;
+        };
+
+        self.engine.register_fn("render", move |text: &str| {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
-            egui::Window::new(id.clone())
+            egui::Window::new(name.clone())
                 .resizable(true)
                 .show(&ctx, |ui| {
                     // dilemma here is: do you re-parse the RDX every time you render?
@@ -73,35 +128,48 @@ impl PluginDeets {
                 });
         });
 
-        let ast = match engine.compile(&rdx_source) {
-            Ok(ast) => Some(ast),
-            Err(e) => {
-                tracing::error!("Failed to compile RDX source: {:?}", e);
-                None
-            }
-        };
-
-        Self {
-            plugin,
-            engine,
-            ast,
-        }
+        // also regietr in rhai a "now" function to get unix time in seconds
+        self.engine.register_fn("now", || {
+            let unix_timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64;
+            Dynamic::from(unix_timestamp)
+        });
     }
 
     /// Render this plugin's UI into the given ctx
     pub fn render_rhai(&mut self, ctx: egui::Context) {
+        // get the rhai scope, where the variables are stored
+        // so we can pass it into the rhai engine
+        // so the latest values are used in the script
         let mut scope = {
-            let mut plugin = self.plugin.lock().unwrap();
-            plugin.store.data_mut().scope.set_or_push("ctx", ctx);
+            let plugin = self.plugin.lock().unwrap();
+            //plugin.store.data_mut().scope.set_or_push("ctx", ctx);
             let scope = plugin.store.data().scope.clone();
             scope
         };
+
+        // sif self ctx is None, set it and call register(). This is a one-time thing
+        match self.ctx {
+            Some(_) => {
+                //self.ctx = Some(ctx.clone());
+            }
+            None => {
+                self.ctx = Some(ctx.clone());
+                self.register_fn();
+            }
+        }
 
         if let Some(ast) = &self.ast {
             // Execute script
             if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
                 error!("Failed to execute script: {:?}", e);
             }
+            //match self.engine.call_fn::<()>(&mut scope, ast, "tick", ()) {
+            //    Ok(_) => tracing::info!("Tick function called"),
+            //    Err(_) => tracing::error!("Failed to call tick function"),
+            //}
         }
     }
 }
@@ -240,11 +308,11 @@ pub fn render_component(
                                         .collect::<Vec<_>>();
                                     if let Ok(value) = lock.call(on_change, args.as_slice()) {
                                         match value {
-                                            Value::String(_s) => {
+                                            Some(Value::String(_s)) => {
                                                 // TODO: set the scope variable to the returned value of on_change fn?
                                                 // scope.set_or_push(var_name.as_str(), s);
                                             }
-                                            Value::Bool(_) => {}
+                                            Some(Value::Bool(_)) => {}
                                             _ => {}
                                         }
                                     } else {
@@ -293,7 +361,7 @@ impl RdxApp {
 
             let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone(), scope.clone()));
             let rdx_source = plugin.call("load", &[]).unwrap();
-            let Value::String(rdx_source) = rdx_source else {
+            let Some(Value::String(rdx_source)) = rdx_source else {
                 panic!("RDX Source should be a string");
             };
             plugins.insert(
@@ -307,3 +375,52 @@ impl RdxApp {
 }
 
 impl RdxApp {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::layer::LayerPlugin;
+    use crate::pest::parse;
+    use crate::template::TemplatePart;
+    use rhai::Dynamic;
+
+    // test calling a tick() function in the rhai script
+    #[test]
+    fn test_tick() {
+        let mut engine = rhai::Engine::new();
+        let mut scope = Scope::new();
+
+        // dummy render
+        engine.register_fn("render", |_: egui::Context, _: &str| {});
+
+        engine.on_print(|s| eprint!("{}", s));
+
+        let rdx_source = r#"
+        let interval = 1000; // 1 second
+
+
+        fn tick() {
+            print("*** tick ***");
+        }
+
+        // call the system function `render` on the template with the ctx from scope
+        render(ctx, `
+            <Vertical>
+                <Label>Seconds since unix was invented: {{datetime}}</Label>
+            </Vertical>
+        `);
+        "#;
+
+        let ast = engine.compile(rdx_source).unwrap();
+
+        //// Execute script
+        if let Err(e) = engine.run_ast_with_scope(&mut scope, &ast) {
+            error!("Failed to execute script: {:?}", e);
+        }
+
+        // Call the tick function
+        if let Err(e) = engine.call_fn::<()>(&mut scope, &ast, "tick", ()) {
+            error!("Failed to call tick function: {:?}", e);
+        }
+    }
+}
