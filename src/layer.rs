@@ -5,6 +5,9 @@ mod resource;
 use resource::Resource;
 use resource_table::ResourceTable;
 
+mod noop_waker;
+use noop_waker::noop_waker;
+
 pub mod resource_table;
 
 use std::any::Any;
@@ -122,10 +125,7 @@ fn subscribe_to_duration(
         // NB: this resource created here is not actually exposed to wasm, it's
         // only an internal implementation detail used to match the signature
         // expected by `subscribe`.
-        table
-            .lock()
-            .unwrap()
-            .push(Deadline::Instant(deadline.into()))?
+        table.lock().unwrap().push(Deadline::Instant(deadline))?
     } else {
         // If the user specifies a time so far in the future we can't
         // represent it, wait forever rather than trap.
@@ -213,7 +213,7 @@ impl Layer {
                         tracing::info!("Got ready");
 
                         let mut fut = pin!(ready);
-                        let waker = async_runtime_unknown::noop_waker();
+                        let waker = noop_waker();
                         let mut cx = Context::from_waker(&waker);
 
                         // Poll the future once
@@ -364,7 +364,7 @@ impl Layer {
                                 // only add to the returned list if the future is ready, otherwise skip
                                 // the future until next time
                                 .filter_map(|(mut fut, readylist_indices)| {
-                                    let waker = async_runtime_unknown::noop_waker();
+                                    let waker = noop_waker();
                                     let mut cx = Context::from_waker(&waker);
                                     match fut.as_mut().poll(&mut cx) {
                                         Poll::Ready(()) => Some(readylist_indices),
@@ -571,7 +571,6 @@ mod tests {
     #[derive(Default)]
     struct State {
         count: rhai::Dynamic,
-        table: resource_table::ResourceTable,
     }
 
     impl Inner for State {
@@ -589,10 +588,7 @@ mod tests {
     fn test_instantiate_instance() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data: State = State {
-            count: 0.into(),
-            table: resource_table::ResourceTable::new(),
-        };
+        let data: State = State { count: 0.into() };
 
         let (instance, mut store) = Layer::new().instantiate_instance(WASM, data);
 
@@ -635,10 +631,7 @@ mod tests {
     fn test_plugin() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data: State = State {
-            count: 0.into(),
-            table: resource_table::ResourceTable::new(),
-        };
+        let data: State = State { count: 0.into() };
 
         let mut plugin = LayerPlugin::new(WASM, data);
 

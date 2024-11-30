@@ -1,3 +1,4 @@
+#![allow(dead_code, unused)]
 use core::sync::atomic::{AtomicU64, Ordering::Relaxed};
 use std::marker;
 
@@ -56,7 +57,9 @@ enum ResourceState {
 }
 
 impl AtomicResourceState {
+    #[allow(clippy::declare_interior_mutable_const)]
     const BORROW: Self = Self(AtomicU64::new(ResourceState::BORROW));
+    #[allow(clippy::declare_interior_mutable_const)]
     const NOT_IN_TABLE: Self = Self(AtomicU64::new(ResourceState::NOT_IN_TABLE));
 
     fn get(&self) -> ResourceState {

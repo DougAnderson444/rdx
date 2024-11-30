@@ -1,15 +1,12 @@
 use super::{Resource, ResourceTable};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::any::Any;
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{Context, Poll};
 
 pub type PollableFuture<'a> = Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 pub type MakeFuture = for<'a> fn(&'a mut dyn Any) -> PollableFuture<'a>;
-pub type ClosureFuture = Box<dyn Fn() -> PollableFuture<'static> + Send + 'static>;
 
 /// A host representation of the `wasi:io/poll.pollable` resource.
 ///
@@ -20,7 +17,6 @@ pub type ClosureFuture = Box<dyn Fn() -> PollableFuture<'static> + Send + 'stati
 pub struct Pollable {
     pub index: u32,
     pub make_future: MakeFuture,
-    remove_index_on_delete: Option<fn(&mut ResourceTable, u32) -> Result<()>>,
 }
 
 /// A trait used internally within a [`Pollable`] to create a `pollable`
@@ -95,7 +91,7 @@ pub fn subscribe<T>(
 where
     T: Subscribe,
 {
-    fn make_future<'a, T>(stream: &'a mut dyn Any) -> PollableFuture<'a>
+    fn make_future<T>(stream: &mut dyn Any) -> PollableFuture<'_>
     where
         T: Subscribe,
     {
@@ -104,15 +100,6 @@ where
 
     let pollable = Pollable {
         index: resource.rep(),
-        remove_index_on_delete: if resource.owned() {
-            Some(|table, idx| {
-                let resource = Resource::<T>::new_own(idx);
-                table.delete(resource)?;
-                Ok(())
-            })
-        } else {
-            None
-        },
         make_future: make_future::<T>,
     };
 

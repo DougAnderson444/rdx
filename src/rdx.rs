@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::layer::{self, Inner, LayerPlugin, Pollable};
+use crate::futures;
+use crate::layer::{Inner, LayerPlugin};
 use crate::pest::{parse, Component};
 use crate::template::TemplatePart;
 
@@ -13,7 +14,6 @@ use wasm_component_layer::Value;
 pub struct State<'a> {
     scope: Scope<'a>,
     egui_ctx: Option<egui::Context>,
-    table: layer::resource_table::ResourceTable,
 }
 
 impl<'a> State<'a> {
@@ -21,7 +21,6 @@ impl<'a> State<'a> {
         Self {
             scope,
             egui_ctx: Some(ctx),
-            table: Default::default(),
         }
     }
 }
@@ -70,7 +69,7 @@ impl PluginDeets {
                     // parse it once then store it in a cache for each RDX string?
                     // use std::cell::LazyCell (or LazyLock for sync)
                     if let Ok(components) = parse(text) {
-                        render_component(ui, &components, plugin_clone.clone());
+                        render_component(ui, components, plugin_clone.clone());
                     }
                 });
         });
@@ -111,7 +110,7 @@ impl PluginDeets {
 /// Render the components of this plugin
 pub fn render_component(
     ui: &mut egui::Ui,
-    components: &Vec<Component>,
+    components: Vec<Component>,
     plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
 ) {
     for component in components {

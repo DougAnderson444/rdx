@@ -253,7 +253,7 @@ pub mod wasi {
                         }
                         ptr
                     } else {
-                        { ::core::ptr::null_mut() }
+                        ::core::ptr::null_mut()
                     };
                     for (i, e) in vec0.into_iter().enumerate() {
                         let base = result0.add(i * 4);
@@ -385,6 +385,7 @@ pub mod exports {
     }
 }
 mod _rt {
+    pub use alloc_crate::string::String;
     use core::fmt;
     use core::marker;
     use core::sync::atomic::{AtomicU32, Ordering::Relaxed};
@@ -472,7 +473,6 @@ mod _rt {
     }
     pub use alloc_crate::vec::Vec;
     pub use alloc_crate::alloc;
-    pub use alloc_crate::string::String;
     pub fn as_i64<T: AsI64>(t: T) -> i64 {
         t.as_i64()
     }
@@ -540,24 +540,24 @@ macro_rules! __export_plugin_world_impl {
 #[doc(inline)]
 pub(crate) use __export_plugin_world_impl as export;
 #[cfg(target_arch = "wasm32")]
-#[link_section = "component-type:wit-bindgen:0.30.0:plugin-world:encoded world"]
+#[link_section = "component-type:wit-bindgen:0.35.0:component:plugin:plugin-world:encoded world"]
 #[doc(hidden)]
 pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 624] = *b"\
 \0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xed\x03\x01A\x02\x01\
-A\x0b\x01B\x0a\x04\0\x08pollable\x03\x01\x01h\0\x01@\x01\x04self\x01\0\x7f\x04\0\
-\x16[method]pollable.ready\x01\x02\x01@\x01\x04self\x01\x01\0\x04\0\x16[method]p\
-ollable.block\x01\x03\x01p\x01\x01py\x01@\x01\x02in\x04\0\x05\x04\0\x04poll\x01\x06\
-\x03\x01\x12wasi:io/poll@0.2.2\x05\0\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05\
-event\x03\0\0\x03\x01\x16component:plugin/types\x05\x01\x02\x03\0\x01\x05event\x02\
-\x03\0\0\x08pollable\x01B\x0d\x02\x03\x02\x01\x02\x04\0\x05event\x03\0\0\x02\x03\
-\x02\x01\x03\x04\0\x08pollable\x03\0\x02\x01@\x01\x03msgs\x01\0\x04\0\x03log\x01\
-\x04\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\x05\x01@\0\0x\x04\0\x03now\x01\x06\
-\x01i\x03\x01@\x01\x02msw\0\x07\x04\0\x12subscribe-duration\x01\x08\x03\x01\x15c\
-omponent:plugin/host\x05\x04\x03\0\x05event\x03\0\x02\x01B\x05\x01@\0\0s\x04\0\x04\
-load\x01\0\x04\0\x08datetime\x01\0\x01@\0\x01\0\x04\0\x06ticker\x01\x01\x04\x01\x14\
-component:plugin/run\x05\x06\x04\x01\x1dcomponent:plugin/plugin-world\x04\0\x0b\x12\
-\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-co\
-mponent\x070.215.0\x10wit-bindgen-rust\x060.30.0";
+A\x0b\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\0\x16compo\
+nent:plugin/types\x05\0\x02\x03\0\0\x05event\x03\0\x05event\x03\0\x01\x01B\x0a\x04\
+\0\x08pollable\x03\x01\x01h\0\x01@\x01\x04self\x01\0\x7f\x04\0\x16[method]pollab\
+le.ready\x01\x02\x01@\x01\x04self\x01\x01\0\x04\0\x16[method]pollable.block\x01\x03\
+\x01p\x01\x01py\x01@\x01\x02in\x04\0\x05\x04\0\x04poll\x01\x06\x03\0\x12wasi:io/\
+poll@0.2.2\x05\x03\x02\x03\0\x01\x08pollable\x01B\x0d\x02\x03\x02\x01\x01\x04\0\x05\
+event\x03\0\0\x02\x03\x02\x01\x04\x04\0\x08pollable\x03\0\x02\x01@\x01\x03msgs\x01\
+\0\x04\0\x03log\x01\x04\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\x05\x01@\0\0\
+x\x04\0\x03now\x01\x06\x01i\x03\x01@\x01\x02msw\0\x07\x04\0\x12subscribe-duratio\
+n\x01\x08\x03\0\x15component:plugin/host\x05\x05\x01B\x05\x01@\0\0s\x04\0\x04loa\
+d\x01\0\x04\0\x08datetime\x01\0\x01@\0\x01\0\x04\0\x06ticker\x01\x01\x04\0\x14co\
+mponent:plugin/run\x05\x06\x04\0\x1dcomponent:plugin/plugin-world\x04\0\x0b\x12\x01\
+\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cprocessed-by\x02\x0dwit-compon\
+ent\x070.220.0\x10wit-bindgen-rust\x060.35.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

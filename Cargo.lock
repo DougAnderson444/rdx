@@ -399,15 +399,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-runtime-unknown"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "slab",
- "wasm_component_layer",
-]
-
-[[package]]
 name = "async-signal"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1212,7 +1203,6 @@ name = "datetime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-runtime-unknown",
  "futures",
  "slab",
  "wit-bindgen-rt 0.35.0",
@@ -3283,7 +3273,6 @@ name = "rdx"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "async-runtime-unknown",
  "async-trait",
  "eframe",
  "egui",
@@ -6088,8 +6077,3 @@ dependencies = [
  "quote",
  "syn",
 ]
-
-[[patch.unused]]
-name = "wasm_component_layer"
-version = "0.1.18"
-source = "git+https://github.com/DougAnderson444/wasm_component_layer.git#63db9000d70902192fbe27027f478e010b833dbe"

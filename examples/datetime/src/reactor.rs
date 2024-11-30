@@ -1,14 +1,11 @@
-use crate::bindings::wasi::io::poll::poll;
-
 use super::Pollable;
 
 use super::polling::{EventKey, Poller};
 
 use std::collections::HashMap;
 use std::future::{self, Future};
-use std::pin::Pin;
+use std::task::Poll;
 use std::task::Waker;
-use std::task::{Context, Poll};
 use std::{cell::RefCell, rc::Rc};
 
 /// Manage async system resources for WASI 0.1
@@ -74,27 +71,27 @@ impl Reactor {
     }
 }
 
-/// Turn a single pollable into a future.
-pub struct PollableFuture {
-    pollable: Pollable,
-}
-
-impl PollableFuture {
-    /// Create a new instance of `PollableFuture`
-    pub(crate) fn new(pollable: Pollable) -> Self {
-        Self { pollable }
-    }
-}
-
-impl Future for PollableFuture {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.pollable.ready() {
-            Poll::Ready(())
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-}
+///// Turn a single pollable into a future.
+//pub struct PollableFuture {
+//    pollable: Pollable,
+//}
+//
+//impl PollableFuture {
+//    /// Create a new instance of `PollableFuture`
+//    pub(crate) fn new(pollable: Pollable) -> Self {
+//        Self { pollable }
+//    }
+//}
+//
+//impl Future for PollableFuture {
+//    type Output = ();
+//
+//    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//        if self.pollable.ready() {
+//            Poll::Ready(())
+//        } else {
+//            cx.waker().wake_by_ref();
+//            Poll::Pending
+//        }
+//    }
+//}

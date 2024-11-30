@@ -9,8 +9,6 @@ mod polling;
 #[allow(warnings)]
 mod bindings;
 
-use bindings::component::plugin::host::log;
-
 use bindings::component::plugin::host::{emit, now, subscribe_duration};
 use bindings::component::plugin::types::Event;
 use bindings::exports::component::plugin::run::Guest;

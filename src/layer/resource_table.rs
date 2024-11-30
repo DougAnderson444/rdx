@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::Resource;
 use core::any::Any;
 use core::fmt;
@@ -285,10 +286,10 @@ impl ResourceTable {
     /// Zip the values of the map with mutable references to table entries corresponding to each
     /// key. As the keys in the `HashMap` are unique, this iterator can give mutable references
     /// with the same lifetime as the mutable reference to the [ResourceTable].
-    pub fn iter_entries<'a, T>(
-        &'a mut self,
+    pub fn iter_entries<T>(
+        &mut self,
         map: std::collections::HashMap<u32, T>,
-    ) -> impl Iterator<Item = (Result<&'a mut dyn Any, ResourceTableError>, T)> {
+    ) -> impl Iterator<Item = (Result<&mut dyn Any, ResourceTableError>, T)> {
         map.into_iter().map(move |(k, v)| {
             let item = self
                 .occupied_mut(k)
