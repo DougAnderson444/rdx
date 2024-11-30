@@ -23,6 +23,9 @@ mod template;
 mod utils;
 
 /// A module to hold the build script
+// not wasm32
+#[cfg(not(target_arch = "wasm32"))]
 mod build_script;
 /// Export helper function to build the script
+#[cfg(not(target_arch = "wasm32"))]
 pub use build_script::build_script;
