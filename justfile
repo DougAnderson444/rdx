@@ -30,5 +30,8 @@ web-dev: build
 check: build
   ./check.sh
 
+check32:
+  cargo check --target wasm32-unknown-unknown
+
 force:
   cargo run --bin force-build-wasm-bins

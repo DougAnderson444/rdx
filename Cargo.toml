@@ -57,8 +57,8 @@ rhai = { version = "1.19", features = ["sync"] }
 wasmtime = { version = "25" }
 wasmtime-wasi = { version = "25" }
 wasi-common = { version = "25.0.1", features = ["tokio"] }
-wasm-compose = "0.219.1"
-wasmparser = "0.219.1"
+wasm-compose = "0.221"
+wasmparser = "0.221"
 wasmtime_runtime_layer = "26.0.0"
 tokio = { version = "1", features = ["full"] }
 
@@ -74,7 +74,7 @@ send_wrapper = { version = "0.6.0", features = ["futures"] }
 web-time = "1.1.0"
 
 [build-dependencies]
-wasmparser = "0.220"
+wasmparser = "0.221"
 
 [profile.release]
 opt-level = 2 # fast and small wasm
