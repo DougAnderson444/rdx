@@ -8,11 +8,6 @@ pub enum Error {
     #[error("Parse error: {0}")]
     Parse(#[from] Box<pest::error::Error<Rule>>),
 
-    /// Wasmtime error
-    #[cfg(not(target_arch = "wasm32"))]
-    #[error("Anyhow Error: {0}")]
-    Wasmtime(#[from] wasmtime::Error),
-
     /// Function not found in wasm component instance. Do you have the right plugin name?
     #[error("Function not found: {0}")]
     FuncNotFound(String),
@@ -26,7 +21,6 @@ pub enum Error {
     InstanceNotFound,
 
     /// From anyhow
-    #[cfg(target_arch = "wasm32")]
     #[error("Anyhow Error: {0}")]
     Anyhow(#[from] anyhow::Error),
 }

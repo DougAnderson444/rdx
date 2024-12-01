@@ -61,31 +61,6 @@ impl PluginDeets {
         let engine = rhai::Engine::new();
         let plugin = Arc::new(Mutex::new(plugin));
 
-        //engine.register_fn("render", move |ctx: egui::Context, text: &str| {
-        //    // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
-        //    egui::Window::new(id.clone())
-        //        .resizable(true)
-        //        .show(&ctx, |ui| {
-        //            // dilemma here is: do you re-parse the RDX every time you render?
-        //            // if it's parsed once, where is the Component stored?
-        //            // and How do we refer to it?
-        //            // parse it once then store it in a cache for each RDX string?
-        //            // use std::cell::LazyCell (or LazyLock for sync)
-        //            if let Ok(components) = parse(text) {
-        //                render_component(ui, &components, plugin_clone.clone());
-        //            }
-        //        });
-        //});
-        //
-        //// also regietr in rhai a "now" function to get unix time in seconds
-        //engine.register_fn("now", || {
-        //    let unix_timestamp = SystemTime::now()
-        //        .duration_since(SystemTime::UNIX_EPOCH)
-        //        .unwrap()
-        //        .as_secs() as i64;
-        //    Dynamic::from(unix_timestamp)
-        //});
-
         let ast = match engine.compile(&rdx_source) {
             Ok(ast) => Some(ast),
             Err(e) => {
@@ -117,11 +92,9 @@ impl PluginDeets {
             egui::Window::new(name.clone())
                 .resizable(true)
                 .show(&ctx, |ui| {
-                    // dilemma here is: do you re-parse the RDX every time you render?
-                    // if it's parsed once, where is the Component stored?
-                    // and How do we refer to it?
-                    // parse it once then store it in a cache for each RDX string?
-                    // use std::cell::LazyCell (or LazyLock for sync)
+                    // TODO: We're re-parsing the RDX every time we render.
+                    // This could be done using a HashMap of RDX strings to
+                    // LazyLock to ensure it's only parsed once.
                     if let Ok(components) = parse(text) {
                         render_component(ui, components, plugin_clone.clone());
                     }

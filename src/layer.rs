@@ -463,7 +463,7 @@ pub fn instantiate_instance<T: Inner + 'static>(
         .unwrap();
 
     // sleep takes ms and returns a Pollable resource type
-    let table = table.clone();
+    let table_clone = table.clone();
     host_interface
         .define_func(
             "subscribe-duration",
@@ -482,11 +482,11 @@ pub fn instantiate_instance<T: Inner + 'static>(
                     };
 
                     let resource_pollable =
-                        subscribe_to_duration(table.clone(), Duration::from_millis(millis))
+                        subscribe_to_duration(table_clone.clone(), Duration::from_millis(millis))
                             .map_err(|e| {
-                                tracing::error!("Error subscribing to duration: {:?}", e);
-                                e
-                            })?;
+                            tracing::error!("Error subscribing to duration: {:?}", e);
+                            e
+                        })?;
 
                     let pollable_resource = ResourceOwn::new(
                         &mut store,

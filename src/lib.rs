@@ -16,10 +16,8 @@ pub use error::Error;
 
 pub mod pest;
 
-mod layer;
-// mod plugins;
-//mod sleep;
 mod futures;
+mod layer;
 mod template;
 mod utils;
 

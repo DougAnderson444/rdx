@@ -49,20 +49,15 @@ time = "0.3"
 async-trait = "0.1.83"
 anyhow = "1.0.93"
 futures-lite = "2.5.0"
-# native:
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
 rhai = { version = "1.19", features = ["sync"] }
-# TODO: Feature gate this & use jco for wasm-bindgen builds
-wasmtime = { version = "25" }
-wasmtime-wasi = { version = "25" }
-wasi-common = { version = "25.0.1", features = ["tokio"] }
-wasm-compose = "0.221"
 wasmparser = "0.221"
+# TODO: Feature gate this: Could choose wasmi or wasmtime.
 wasmtime_runtime_layer = "26.0.0"
 tokio = { version = "1", features = ["full"] }
 
-# web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3.70"                                           # to access the DOM (to hide the loading text)
