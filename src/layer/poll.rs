@@ -1,3 +1,4 @@
+//! Ported from >https://github.com/bytecodealliance/wasmtime/blob/main/crates/wasi/src/poll.rs> to support async/await
 use super::{Resource, ResourceTable};
 use anyhow::Result;
 use std::any::Any;
@@ -36,7 +37,7 @@ pub struct Pollable {
 /// This is a simple example of creating a `Pollable` resource from a few
 /// parameters.
 ///
-/// ```
+/// ```ignore
 /// use tokio::time::{self, Duration, Instant};
 /// use wasmtime_wasi::{WasiView, Subscribe, subscribe, Pollable, async_trait};
 /// use wasmtime::component::Resource;
