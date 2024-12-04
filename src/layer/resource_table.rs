@@ -70,9 +70,9 @@ impl Entry {
 /// * whenever a child is deleted, its index is removed from children.
 /// * an entry with children may not be deleted.
 #[derive(Debug)]
-pub(crate) struct TableEntry {
+pub struct TableEntry {
     /// The entry in the table, as a boxed dynamically-typed object
-    pub(crate) entry: Box<dyn Any + Send>,
+    pub entry: Box<dyn Any + Send>,
     /// The index of the parent of this entry, if it has one.
     parent: Option<u32>,
     /// The indices of any children of this entry.
@@ -179,7 +179,7 @@ impl ResourceTable {
             .ok_or(ResourceTableError::NotPresent)
     }
 
-    pub(crate) fn occupied_mut(&mut self, key: u32) -> Result<&mut TableEntry, ResourceTableError> {
+    pub fn occupied_mut(&mut self, key: u32) -> Result<&mut TableEntry, ResourceTableError> {
         self.entries
             .get_mut(key as usize)
             .and_then(Entry::occupied_mut)

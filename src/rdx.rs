@@ -1,35 +1,69 @@
+#![allow(clippy::arc_with_non_send_sync)]
+
 use std::collections::HashMap;
+use std::ops::Deref as _;
 use std::sync::{Arc, Mutex};
 
-use crate::layer::{Inner, LayerPlugin};
+use crate::layer::{Inner, Instantiator, LayerPlugin};
 use crate::pest::{parse, Component};
-use crate::template::TemplatePart;
+use crate::template::{Template, TemplatePart};
 
 use rhai::{Dynamic, Scope};
+use send_wrapper::SendWrapper;
 use tracing::error;
 use wasm_component_layer::Value;
 
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::SystemTime;
-#[cfg(target_arch = "wasm32")]
-use web_time::SystemTime;
+pub struct RdxApp {
+    pub(crate) plugins: HashMap<String, PluginDeets<State>>,
+}
+
+impl Default for RdxApp {
+    fn default() -> Self {
+        Self::new(None)
+    }
+}
+
+impl RdxApp {
+    pub fn new(ctx: Option<egui::Context>) -> Self {
+        let mut plugins = HashMap::new();
+        for (name, wasm_bytes) in crate::BUILTIN_PLUGINS.iter() {
+            // TODO: init from wasm logic somehow!
+            // scope.set_or_push("count", 0);
+
+            let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone()));
+            let rdx_source = plugin.call("load", &[]).unwrap();
+            let Some(Value::String(rdx_source)) = rdx_source else {
+                panic!("RDX Source should be a string");
+            };
+
+            let plugin_mod = Arc::new(Mutex::new(Box::new(plugin) as Box<dyn Instantiator<_>>));
+
+            plugins.insert(
+                name.to_string(),
+                PluginDeets::new(name.to_string(), plugin_mod, rdx_source.to_string()),
+            );
+        }
+
+        Self { plugins }
+    }
+}
 
 #[derive(Debug, Clone)]
-pub struct State<'a> {
-    scope: Scope<'a>,
+pub struct State {
+    scope: Scope<'static>,
     egui_ctx: Option<egui::Context>,
 }
 
-impl<'a> State<'a> {
-    pub fn new(ctx: egui::Context, scope: Scope<'a>) -> Self {
+impl State {
+    pub fn new(ctx: Option<egui::Context>) -> Self {
         Self {
-            scope,
-            egui_ctx: Some(ctx),
+            scope: Scope::new(),
+            egui_ctx: ctx,
         }
     }
 }
 
-impl Inner for State<'_> {
+impl Inner for State {
     /// Updates the scope variable to the given value
     fn update(&mut self, key: &str, value: impl Into<Dynamic> + Copy) {
         tracing::info!("Updating key: {} with value: {:?}", key, value.into());
@@ -42,25 +76,45 @@ impl Inner for State<'_> {
             tracing::warn!("Egui context is not set");
         }
     }
+
+    fn scope(&self) -> &rhai::Scope {
+        &self.scope
+    }
+
+    fn scope_mut(&mut self) -> &mut rhai::Scope<'static> {
+        &mut self.scope
+    }
+
+    // into_scope with 'static lifetime'
+    fn into_scope(self) -> rhai::Scope<'static> {
+        self.scope
+    }
 }
 
 /// The details of a plugin
-pub struct PluginDeets {
+pub struct PluginDeets<T: Inner + Send> {
+    /// The name of the plugin
     name: String,
-    /// Reference counted so we can pass it into the rhai engine closure
-    pub plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
-    // Could be here for display purposes only, once it's compiled we're done using it.
-    // rdx_source: String,
+    /// Reference counted impl [Instantiator] so we can pass it into the rhai engine closure
+    pub plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
+    /// The rhai engine
     engine: rhai::Engine,
+    /// The AST of the RDX source
     ast: Option<rhai::AST>,
+    /// The egui context, so we can `.show()` an [egui::Window]
     ctx: Option<egui::Context>,
 }
 
-impl PluginDeets {
-    fn new(name: String, plugin: LayerPlugin<State<'static>>, rdx_source: String) -> Self {
+impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
+    /// pass any plugin that impls Instantiator
+    pub fn new(
+        name: String,
+        plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
+        rdx_source: String,
+    ) -> Self {
         let engine = rhai::Engine::new();
-        let plugin = Arc::new(Mutex::new(plugin));
 
+        // Compile the RDX source once ahead of time
         let ast = match engine.compile(&rdx_source) {
             Ok(ast) => Some(ast),
             Err(e) => {
@@ -80,7 +134,8 @@ impl PluginDeets {
 
     /// Registers functions in the rhai Engine
     pub fn register_fn(&mut self) {
-        let plugin_clone = self.plugin.clone();
+        tracing::info!("Registering functions for plugin: {}", self.name);
+        let plugin_clone = SendWrapper::new(self.plugin.clone());
         let name = self.name.clone();
         let Some(ctx) = self.ctx.clone() else {
             tracing::warn!("Egui context is not set");
@@ -95,19 +150,20 @@ impl PluginDeets {
                     // TODO: We're re-parsing the RDX every time we render.
                     // This could be done using a HashMap of RDX strings to
                     // LazyLock to ensure it's only parsed once.
+
+                    // unwrap the sendwrapper to get the plugin
+                    let plugin_clone = plugin_clone.deref();
+
                     if let Ok(components) = parse(text) {
                         render_component(ui, components, plugin_clone.clone());
+                    } else {
+                        tracing::error!(
+                            "Failed to parse RDX source for plugin: {}, source {}",
+                            name,
+                            text
+                        );
                     }
                 });
-        });
-
-        // also regietr in rhai a "now" function to get unix time in seconds
-        self.engine.register_fn("now", || {
-            let unix_timestamp = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs() as i64;
-            Dynamic::from(unix_timestamp)
         });
     }
 
@@ -116,12 +172,12 @@ impl PluginDeets {
         // get the rhai scope, where the variables are stored
         // so we can pass it into the rhai engine
         // so the latest values are used in the script
-        let mut scope = {
-            let plugin = self.plugin.lock().unwrap();
-            //plugin.store.data_mut().scope.set_or_push("ctx", ctx);
-            let scope = plugin.store.data().scope.clone();
-            scope
-        };
+        //let mut scope = {
+        //    let plugin = self.plugin.lock().unwrap();
+        //    //plugin.store.data_mut().scope.set_or_push("ctx", ctx);
+        //    let scope = plugin.store().data().scope().clone();
+        //    scope
+        //};
 
         // sif self ctx is None, set it and call register(). This is a one-time thing
         if self.ctx.is_none() {
@@ -130,7 +186,15 @@ impl PluginDeets {
         }
 
         if let Some(ast) = &self.ast {
-            // Execute script
+            // Get the scope from the plugin and clone it
+            let mut scope = {
+                let plugin = self.plugin.lock().unwrap();
+                plugin.store().data().clone().into_scope()
+            };
+
+            // Execute script.
+            // Since the script returns `render(some_rdx_code)`, it will in turn
+            // call register_fn("render") and render the UI.
             if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
                 error!("Failed to execute script: {:?}", e);
             }
@@ -143,11 +207,29 @@ impl PluginDeets {
 }
 
 /// Render the components of this plugin
-pub fn render_component(
+pub fn render_component<T: Inner + Send + Sync>(
     ui: &mut egui::Ui,
     components: Vec<Component>,
-    plugin: Arc<Mutex<LayerPlugin<State<'static>>>>,
+    plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
 ) {
+    let content_from_template = |content: String, template: Option<Template>| {
+        if let Some(template) = template {
+            let lock = plugin.lock().unwrap();
+            let state = lock.store().data();
+            // map the key, is_constant, valure to &str, &str iterator
+            let scope = state.scope();
+            let entries = scope
+                .iter()
+                .map(|(k, _c, v)| (k, v.to_string()))
+                .collect::<Vec<_>>();
+            let ent = template.render(entries);
+            drop(lock);
+            ent
+        } else {
+            content.to_string()
+        }
+    };
+
     for component in components {
         match component {
             Component::Vertical { children, .. } => {
@@ -185,7 +267,21 @@ pub fn render_component(
                         tracing::debug!("On click {:?}", on_click);
                         let func_args = functions.get(on_click).unwrap();
                         tracing::debug!("Func args {:?}", func_args);
-                        match plugin.lock().unwrap().call(on_click, &[]) {
+
+                        let mut lock = plugin.lock().unwrap();
+                        let scope = &mut lock.store_mut().data_mut().scope();
+                        let args = func_args
+                            .iter()
+                            .map(|v| {
+                                Value::String(
+                                    scope.get_value::<String>(v).unwrap_or_default().into(),
+                                )
+                            })
+                            .collect::<Vec<_>>();
+
+                        tracing::debug!("rt'd args {:?}", args);
+
+                        match lock.call(on_click, args.as_slice()) {
                             Ok(res) => {
                                 tracing::info!("on_click response {:?}", res);
                             }
@@ -208,24 +304,18 @@ pub fn render_component(
                     _ => 16.0,
                 };
 
-                let content = if let Some(template) = template {
-                    let lock = plugin.lock().unwrap();
-                    let state = lock.store.data();
-                    // map the key, is_constant, valure to &str, &str iterator
-                    let entries = state
-                        .scope
-                        .iter()
-                        .map(|(k, _c, v)| (k, v.to_string()))
-                        .collect::<Vec<_>>();
-                    template.render(entries)
-                } else {
-                    content.to_string()
-                };
+                let content = content_from_template(content, template);
 
                 ui.label(egui::RichText::new(content).size(size));
                 ui.add_space(4.0);
             }
-            Component::Text { content, props } => {
+            Component::Text {
+                content,
+                props,
+                template,
+            } => {
+                let content = content_from_template(content, template);
+
                 let size = match props.get("size").map(|s| s.as_str()) {
                     Some("small") => 14.0,
                     Some("large") => 18.0,
@@ -259,26 +349,33 @@ pub fn render_component(
                     // Put the value into rhai::Scope as the value of the variable
                     // Can I just linkt he rhai scope variable to the TextEdit widget?
                     let mut lock = plugin.lock().unwrap();
-                    let scope = &mut lock.store.data_mut().scope;
+                    let scope = &mut lock.store_mut().data_mut().scope_mut();
 
                     if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
                         let response = ui.add(egui::TextEdit::singleline(&mut val));
                         if response.changed() {
                             // update the scope variable
-                            scope.set_or_push(var_name.as_str(), val);
+                            scope.set_or_push(var_name.as_str(), val.clone());
 
                             // also call the on_change function
                             if let Some(on_change) = props.get("on_change") {
                                 if let Some(func_args) = functions.get(on_change) {
                                     let args = func_args
                                         .iter()
-                                        .map(|v| Value::String(v.to_string().into()))
+                                        .map(|v| {
+                                            Value::String(
+                                                scope
+                                                    .get_value::<String>(v)
+                                                    .unwrap_or_default()
+                                                    .into(),
+                                            )
+                                        })
                                         .collect::<Vec<_>>();
+
                                     if let Ok(value) = lock.call(on_change, args.as_slice()) {
                                         match value {
                                             Some(Value::String(_s)) => {
-                                                // TODO: set the scope variable to the returned value of on_change fn?
-                                                // scope.set_or_push(var_name.as_str(), s);
+                                                // TODO: act on return value(s)?
                                             }
                                             Some(Value::Bool(_)) => {}
                                             _ => {}
@@ -307,42 +404,6 @@ pub fn render_component(
         }
     }
 }
-pub struct RdxApp {
-    pub(crate) plugins: HashMap<String, PluginDeets>,
-}
-
-impl Default for RdxApp {
-    fn default() -> Self {
-        let ctx = egui::Context::default();
-        Self::new(ctx)
-    }
-}
-
-impl RdxApp {
-    pub fn new(ctx: egui::Context) -> Self {
-        let mut plugins = HashMap::new();
-        for (name, wasm_bytes) in crate::BUILTIN_PLUGINS.iter() {
-            let scope = Scope::new();
-
-            // TODO: init from wasm logic somehow!
-            // scope.set_or_push("count", 0);
-
-            let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone(), scope.clone()));
-            let rdx_source = plugin.call("load", &[]).unwrap();
-            let Some(Value::String(rdx_source)) = rdx_source else {
-                panic!("RDX Source should be a string");
-            };
-            plugins.insert(
-                name.to_string(),
-                PluginDeets::new(name.to_string(), plugin, rdx_source.to_string()),
-            );
-        }
-
-        Self { plugins }
-    }
-}
-
-impl RdxApp {}
 
 #[cfg(test)]
 mod tests {

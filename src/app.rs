@@ -56,7 +56,10 @@ impl TemplateApp {
             return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
         }
 
-        Default::default()
+        Self {
+            rdx: RdxApp::new(Some(cc.egui_ctx.clone())),
+            ..Default::default()
+        }
     }
 }
 

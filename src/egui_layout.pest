@@ -1,5 +1,8 @@
 //! Parse <Horizontal> into egui layout
 
+// Comments are ignored, either // or /* */
+COMMENT = _{ "/*" ~ (!"*/" ~ ANY)* ~ "*/" | "//" ~ (!("\n" | "\r") ~ ANY)* }
+
 WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
 
 /// Identifier (for tag names and attribute names)

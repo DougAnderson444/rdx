@@ -41,6 +41,7 @@ pub enum Component {
     },
     Text {
         content: String,
+        template: Option<Template>,
         props: HashMap<String, String>,
     },
     TextEdit {
@@ -49,6 +50,7 @@ pub enum Component {
         functions: HashMap<String, Vec<String>>,
         template: Option<Template>,
     },
+    // List an iterator
 }
 
 impl FromTagName for Component {
@@ -86,6 +88,11 @@ impl FromTagName for Component {
                 props,
                 functions: functions.unwrap_or_default(),
                 template,
+            }),
+            "Text" => Some(Component::Text {
+                content: content.unwrap(),
+                template,
+                props,
             }),
             _ => None,
         }
@@ -212,6 +219,7 @@ fn parse_element(pair: pest::iterators::Pair<'_, Rule>) -> Result<Component, Err
                         } else {
                             Some(Ok(Component::Text {
                                 content: text.to_string(),
+                                template: None,
                                 props: HashMap::default(),
                             }))
                         }
@@ -523,6 +531,103 @@ mod tests {
                         .collect(),
                     }
                 ]
+            }]
+        );
+    }
+
+    #[test]
+    fn test_text_edit_with_comments() {
+        let input = r#"
+            <Vertical>
+                // This is a comment
+                <TextEdit on_change=handle_change(username)>Username is {{username}}</TextEdit>
+                /* This is a block comment */
+                <TextEdit on_change=handle_change(password)>Password</TextEdit>
+                <Button on_click=login(username,password)>Login</Button>
+                <Button on_click=logout(username, password)>Logout</Button>
+            </Vertical>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            vec![Component::Vertical {
+                content: None,
+                props: HashMap::default(),
+                children: vec![
+                    Component::TextEdit {
+                        content: "Username is {{username}}".to_string(),
+                        props: vec![("on_change".to_string(), "handle_change".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "handle_change".to_string(),
+                            vec!["username".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                        template: Some(Template::new("Username is {{username}}")),
+                    },
+                    Component::TextEdit {
+                        content: "Password".to_string(),
+                        props: vec![("on_change".to_string(), "handle_change".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "handle_change".to_string(),
+                            vec!["password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                        template: None
+                    },
+                    Component::Button {
+                        content: Some("Login".to_string()),
+                        props: vec![("on_click".to_string(), "login".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "login".to_string(),
+                            vec!["username".to_string(), "password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                    },
+                    Component::Button {
+                        content: Some("Logout".to_string()),
+                        props: vec![("on_click".to_string(), "logout".to_string())]
+                            .into_iter()
+                            .collect(),
+                        functions: vec![(
+                            "logout".to_string(),
+                            vec!["username".to_string(), "password".to_string()]
+                        )]
+                        .into_iter()
+                        .collect(),
+                    }
+                ]
+            }]
+        );
+    }
+
+    // test Text with {{template}} in it
+    #[test]
+    fn test_text_with_template() {
+        let input = r#"
+            <Vertical>
+                <Text>My name is {{name}}</Text>
+            </Vertical>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            vec![Component::Vertical {
+                content: None,
+                props: HashMap::default(),
+                children: vec![Component::Text {
+                    content: "My name is {{name}}".to_string(),
+                    template: Some(Template::new("My name is {{name}}")),
+                    props: HashMap::default(),
+                }]
             }]
         );
     }

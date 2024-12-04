@@ -9,17 +9,22 @@ mod app;
 pub use app::TemplateApp;
 
 mod rdx;
-pub use rdx::RdxApp;
+use rdx::RdxApp;
+pub use rdx::{PluginDeets, State};
+
+pub use wasm_component_layer;
 
 mod error;
 pub use error::Error;
 
-pub mod pest;
+mod pest;
 
 mod futures;
-mod layer;
+pub mod layer;
+pub use layer::LayerPlugin;
+
 mod template;
-mod utils;
+pub mod utils;
 
 /// A module to hold the build script
 // not wasm32

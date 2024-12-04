@@ -1,12 +1,12 @@
-mod poll;
+pub mod poll;
 use poll::{subscribe, MakeFuture, PollableFuture, Subscribe};
 
 mod resource;
-use resource::Resource;
-use resource_table::ResourceTable;
+pub use resource::Resource;
+pub use resource_table::ResourceTable;
 
 mod noop_waker;
-use noop_waker::noop_waker;
+pub use noop_waker::noop_waker;
 
 pub mod resource_table;
 
@@ -16,16 +16,19 @@ use std::pin::Pin;
 
 use std::sync::{Arc, Mutex};
 #[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant, SystemTime};
+pub use std::time::{Duration, Instant, SystemTime};
 #[cfg(target_arch = "wasm32")]
-use web_time::{Duration, Instant, SystemTime};
+pub use web_time::{Duration, Instant, SystemTime};
 
-use anyhow::bail;
+pub use anyhow::bail;
 use core::future::Future;
 use core::pin::pin;
 use core::task::{Context, Poll};
+
+pub use rhai;
+
 pub use poll::Pollable;
-use wasm_component_layer::{
+pub use wasm_component_layer::{
     AsContext as _, AsContextMut as _, Component, Engine, Func, FuncType, Instance, Linker, List,
     ListType, RecordType, ResourceOwn, ResourceType, Store, Value, ValueType,
 };
@@ -34,13 +37,21 @@ use wasm_component_layer::{
 pub use wasmtime_runtime_layer as runtime_layer;
 
 #[cfg(target_arch = "wasm32")]
-use js_wasm_runtime_layer as runtime_layer;
+pub use js_wasm_runtime_layer as runtime_layer;
 
-use crate::Error;
+pub use crate::Error;
 
 pub trait Inner {
     /// Update the state with the given key and value
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
+
+    /// Return the [rhai::Scope]
+    fn scope(&self) -> &rhai::Scope;
+
+    fn scope_mut(&mut self) -> &mut rhai::Scope<'static>;
+
+    /// Consumes [Inner] to yield Owned Scope
+    fn into_scope(self) -> rhai::Scope<'static>;
 }
 
 /// The sleep resource
@@ -504,13 +515,27 @@ pub fn instantiate_instance<T: Inner + 'static>(
     (linker.instantiate(&mut store, &component).unwrap(), store)
 }
 
+pub trait Instantiator<T: Inner + Send + Sync> {
+    /// returns the Store
+    fn store(&self) -> &Store<T, runtime_layer::Engine>;
+
+    /// mut Store
+    fn store_mut(&mut self) -> &mut Store<T, runtime_layer::Engine>;
+
+    //scope fn
+    fn scope(&self) -> &rhai::Scope;
+
+    // call fn
+    fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error>;
+}
+
 /// Plugin struct to store some state
-pub struct LayerPlugin<T: Inner> {
+pub struct LayerPlugin<T: Inner + Send + Sync> {
     pub(crate) store: Store<T, runtime_layer::Engine>,
     raw_instance: wasm_component_layer::Instance,
 }
 
-impl<T: Inner + 'static> LayerPlugin<T> {
+impl<T: Inner + Send + Sync + 'static> LayerPlugin<T> {
     /// Creates a new plugin instance with the given name and bytes
     pub fn new(bytes: &[u8], data: T) -> Self {
         let (instance, store) = instantiate_instance(bytes, data);
@@ -520,9 +545,24 @@ impl<T: Inner + 'static> LayerPlugin<T> {
             raw_instance: instance,
         }
     }
+}
+
+impl<T: Inner + Send + Sync + 'static> Instantiator<T> for LayerPlugin<T> {
+    fn scope(&self) -> &rhai::Scope {
+        self.store.data().scope()
+    }
+
+    fn store(&self) -> &Store<T, runtime_layer::Engine> {
+        &self.store
+    }
+
+    fn store_mut(&mut self) -> &mut Store<T, runtime_layer::Engine> {
+        &mut self.store
+    }
 
     /// Calls the given function name with the given parameters
-    pub fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error> {
+    fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error> {
+        tracing::info!("Calling function: {}", name);
         let export_instance = self
             .raw_instance
             .exports()
@@ -559,6 +599,7 @@ mod tests {
     #[derive(Default)]
     struct State {
         count: rhai::Dynamic,
+        scope: rhai::Scope<'static>,
     }
 
     impl Inner for State {
@@ -570,13 +611,28 @@ mod tests {
                 self.count = value.into();
             }
         }
+
+        fn scope(&self) -> &rhai::Scope {
+            &self.scope
+        }
+
+        fn scope_mut(&mut self) -> &mut rhai::Scope<'static> {
+            &mut self.scope
+        }
+
+        fn into_scope(self) -> rhai::Scope<'static> {
+            self.scope
+        }
     }
 
     #[test]
     fn test_instantiate_instance() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data: State = State { count: 0.into() };
+        let data: State = State {
+            count: 0.into(),
+            ..Default::default()
+        };
 
         let (instance, mut store) = instantiate_instance(WASM, data);
 
@@ -619,7 +675,10 @@ mod tests {
     fn test_plugin() {
         const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
 
-        let data: State = State { count: 0.into() };
+        let data: State = State {
+            count: 0.into(),
+            ..Default::default()
+        };
 
         let mut plugin = LayerPlugin::new(WASM, data);
 
