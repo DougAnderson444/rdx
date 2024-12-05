@@ -66,7 +66,6 @@ impl State {
 impl Inner for State {
     /// Updates the scope variable to the given value
     fn update(&mut self, key: &str, value: impl Into<Dynamic> + Copy) {
-        tracing::info!("Updating key: {} with value: {:?}", key, value.into());
         self.scope.set_or_push(key, value.into());
         if let Some(egui_ctx) = &self.egui_ctx {
             tracing::info!("Requesting repaint");

@@ -48,6 +48,7 @@ pub trait Inner {
     /// Return the [rhai::Scope]
     fn scope(&self) -> &rhai::Scope;
 
+    /// Return the mutable [rhai::Scope]
     fn scope_mut(&mut self) -> &mut rhai::Scope<'static>;
 
     /// Consumes [Inner] to yield Owned Scope
