@@ -97,7 +97,7 @@ pub struct PluginDeets<T: Inner + Send> {
     /// Reference counted impl [Instantiator] so we can pass it into the rhai engine closure
     pub plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
     /// The rhai engine
-    engine: rhai::Engine,
+    pub engine: rhai::Engine,
     /// The AST of the RDX source
     ast: Option<rhai::AST>,
     /// The egui context, so we can `.show()` an [egui::Window]
@@ -268,7 +268,7 @@ pub fn render_component<T: Inner + Send + Sync>(
                         tracing::debug!("Func args {:?}", func_args);
 
                         let mut lock = plugin.lock().unwrap();
-                        let scope = &mut lock.store_mut().data_mut().scope();
+                        let scope = lock.store().data().scope();
                         let args = func_args
                             .iter()
                             .map(|v| {
