@@ -129,8 +129,11 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
 
     /// Registers functions in the rhai Engine
     pub fn register_fn(&mut self) {
-        tracing::info!("Registering functions for plugin: {}", self.name);
+        #[cfg(target_arch = "wasm32")]
         let plugin_clone = SendWrapper::new(self.plugin.clone());
+        #[cfg(not(target_arch = "wasm32"))]
+        let plugin_clone = self.plugin.clone();
+
         let name = self.name.clone();
         let Some(ctx) = self.ctx.clone() else {
             tracing::warn!("Egui context is not set");
@@ -147,6 +150,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                     // LazyLock to ensure it's only parsed once.
 
                     // unwrap the sendwrapper to get the plugin
+                    #[cfg(target_arch = "wasm32")]
                     let plugin_clone = plugin_clone.deref();
 
                     if let Ok(components) = parse(text) {
