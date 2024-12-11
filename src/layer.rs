@@ -55,7 +55,7 @@ pub enum ScopeRefMut<'a> {
     Refcell(RefMut<'a, rhai::Scope<'static>>),
 }
 
-impl<'a> Deref for ScopeRef<'a> {
+impl Deref for ScopeRef<'_> {
     type Target = rhai::Scope<'static>;
 
     fn deref(&self) -> &Self::Target {
@@ -66,7 +66,7 @@ impl<'a> Deref for ScopeRef<'a> {
     }
 }
 
-impl<'a> Deref for ScopeRefMut<'a> {
+impl Deref for ScopeRefMut<'_> {
     type Target = rhai::Scope<'static>;
 
     fn deref(&self) -> &Self::Target {
@@ -77,7 +77,7 @@ impl<'a> Deref for ScopeRefMut<'a> {
     }
 }
 
-impl<'a> DerefMut for ScopeRefMut<'a> {
+impl DerefMut for ScopeRefMut<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             ScopeRefMut::Borrowed(scope) => scope,

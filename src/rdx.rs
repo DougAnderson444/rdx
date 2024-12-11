@@ -1,7 +1,6 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
 use std::collections::HashMap;
-use std::ops::Deref as _;
 use std::sync::{Arc, Mutex};
 
 use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
@@ -9,9 +8,14 @@ use crate::pest::{parse, Component};
 use crate::template::{Template, TemplatePart};
 
 use rhai::{Dynamic, Scope};
-use send_wrapper::SendWrapper;
 use tracing::error;
 use wasm_component_layer::Value;
+
+#[cfg(target_arch = "wasm32")]
+use send_wrapper::SendWrapper;
+
+#[cfg(target_arch = "wasm32")]
+use std::ops::Deref as _;
 
 pub struct RdxApp {
     pub(crate) plugins: HashMap<String, PluginDeets<State>>,
@@ -250,8 +254,8 @@ pub fn render_component<T: Inner + Send + Sync>(
                 .iter()
                 .map(|(k, _c, v)| (k, v.to_string()))
                 .collect::<Vec<_>>();
-            let ent = template.render(entries);
-            ent
+
+            template.render(entries)
         } else {
             content.to_string()
         }
