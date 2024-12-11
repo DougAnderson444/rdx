@@ -7,11 +7,15 @@ pub use resource_table::ResourceTable;
 
 mod noop_waker;
 pub use noop_waker::noop_waker;
+use send_wrapper::SendWrapper;
 
 pub mod resource_table;
 
 use std::any::Any;
+use std::cell::{Ref, RefMut};
 use std::collections::HashMap;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::pin::Pin;
 
 use std::sync::{Arc, Mutex};
@@ -41,15 +45,55 @@ pub use js_wasm_runtime_layer as runtime_layer;
 
 pub use crate::Error;
 
+pub enum ScopeRef<'a> {
+    Borrowed(&'a rhai::Scope<'static>),
+    Refcell(Ref<'a, rhai::Scope<'static>>),
+}
+
+pub enum ScopeRefMut<'a> {
+    Borrowed(&'a mut rhai::Scope<'static>),
+    Refcell(RefMut<'a, rhai::Scope<'static>>),
+}
+
+impl<'a> Deref for ScopeRef<'a> {
+    type Target = rhai::Scope<'static>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ScopeRef::Borrowed(scope) => scope,
+            ScopeRef::Refcell(ref_scope) => ref_scope,
+        }
+    }
+}
+
+impl<'a> Deref for ScopeRefMut<'a> {
+    type Target = rhai::Scope<'static>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ScopeRefMut::Borrowed(scope) => scope,
+            ScopeRefMut::Refcell(ref_scope) => ref_scope,
+        }
+    }
+}
+
+impl<'a> DerefMut for ScopeRefMut<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            ScopeRefMut::Borrowed(scope) => scope,
+            ScopeRefMut::Refcell(ref_scope) => ref_scope,
+        }
+    }
+}
 pub trait Inner {
     /// Update the state with the given key and value
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
 
     /// Return the [rhai::Scope]
-    fn scope(&self) -> &rhai::Scope;
+    fn scope(&self) -> ScopeRef;
 
     /// Return the mutable [rhai::Scope]
-    fn scope_mut(&mut self) -> &mut rhai::Scope<'static>;
+    fn scope_mut(&mut self) -> ScopeRefMut; // &mut rhai::Scope<'static>;
 
     /// Consumes [Inner] to yield Owned Scope
     fn into_scope(self) -> rhai::Scope<'static>;
@@ -516,15 +560,12 @@ pub fn instantiate_instance<T: Inner + 'static>(
     (linker.instantiate(&mut store, &component).unwrap(), store)
 }
 
-pub trait Instantiator<T: Inner + Send + Sync> {
+pub trait Instantiator<T: Inner + Send + Sync>: Send {
     /// returns the Store
     fn store(&self) -> &Store<T, runtime_layer::Engine>;
 
     /// mut Store
     fn store_mut(&mut self) -> &mut Store<T, runtime_layer::Engine>;
-
-    //scope fn
-    fn scope(&self) -> &rhai::Scope;
 
     // call fn
     fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error>;
@@ -532,7 +573,7 @@ pub trait Instantiator<T: Inner + Send + Sync> {
 
 /// Plugin struct to store some state
 pub struct LayerPlugin<T: Inner + Send + Sync> {
-    pub(crate) store: Store<T, runtime_layer::Engine>,
+    pub(crate) store: SendWrapper<Store<T, runtime_layer::Engine>>,
     raw_instance: wasm_component_layer::Instance,
 }
 
@@ -542,16 +583,16 @@ impl<T: Inner + Send + Sync + 'static> LayerPlugin<T> {
         let (instance, store) = instantiate_instance(bytes, data);
 
         Self {
-            store,
+            store: SendWrapper::new(store),
             raw_instance: instance,
         }
     }
 }
 
 impl<T: Inner + Send + Sync + 'static> Instantiator<T> for LayerPlugin<T> {
-    fn scope(&self) -> &rhai::Scope {
-        self.store.data().scope()
-    }
+    //fn scope(&self) -> &rhai::Scope {
+    //    self.store.data().scope().into()
+    //}
 
     fn store(&self) -> &Store<T, runtime_layer::Engine> {
         &self.store
@@ -577,7 +618,7 @@ impl<T: Inner + Send + Sync + 'static> Instantiator<T> for LayerPlugin<T> {
         let func_result_len = func.ty().results().len();
         let mut results = vec![Value::Bool(false); func_result_len];
 
-        func.call(&mut self.store, arguments, &mut results)
+        func.call(self.store.deref_mut(), arguments, &mut results)
             .map_err(|e| {
                 tracing::error!("Error calling function: {:?}", e);
                 e
@@ -613,12 +654,12 @@ mod tests {
             }
         }
 
-        fn scope(&self) -> &rhai::Scope {
-            &self.scope
+        fn scope(&self) -> ScopeRef {
+            ScopeRef::Borrowed(&self.scope)
         }
 
-        fn scope_mut(&mut self) -> &mut rhai::Scope<'static> {
-            &mut self.scope
+        fn scope_mut(&mut self) -> ScopeRefMut {
+            ScopeRefMut::Borrowed(&mut self.scope)
         }
 
         fn into_scope(self) -> rhai::Scope<'static> {

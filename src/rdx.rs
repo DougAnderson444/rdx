@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::ops::Deref as _;
 use std::sync::{Arc, Mutex};
 
-use crate::layer::{Inner, Instantiator, LayerPlugin};
+use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
 use crate::pest::{parse, Component};
 use crate::template::{Template, TemplatePart};
 
@@ -36,7 +36,7 @@ impl RdxApp {
                 panic!("RDX Source should be a string");
             };
 
-            let plugin_mod = Arc::new(Mutex::new(Box::new(plugin) as Box<dyn Instantiator<_>>));
+            let plugin_mod = Arc::new(Mutex::new(plugin));
 
             plugins.insert(
                 name.to_string(),
@@ -76,12 +76,12 @@ impl Inner for State {
         }
     }
 
-    fn scope(&self) -> &rhai::Scope {
-        &self.scope
+    fn scope(&self) -> ScopeRef {
+        ScopeRef::Borrowed(&self.scope)
     }
 
-    fn scope_mut(&mut self) -> &mut rhai::Scope<'static> {
-        &mut self.scope
+    fn scope_mut(&mut self) -> ScopeRefMut {
+        ScopeRefMut::Borrowed(&mut self.scope)
     }
 
     // into_scope with 'static lifetime'
@@ -95,7 +95,7 @@ pub struct PluginDeets<T: Inner + Send> {
     /// The name of the plugin
     name: String,
     /// Reference counted impl [Instantiator] so we can pass it into the rhai engine closure
-    pub plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
+    pub plugin: Arc<Mutex<dyn Instantiator<T>>>,
     /// The rhai engine
     pub engine: rhai::Engine,
     /// The AST of the RDX source
@@ -106,11 +106,7 @@ pub struct PluginDeets<T: Inner + Send> {
 
 impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
     /// pass any plugin that impls Instantiator
-    pub fn new(
-        name: String,
-        plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
-        rdx_source: String,
-    ) -> Self {
+    pub fn new(name: String, plugin: Arc<Mutex<dyn Instantiator<T>>>, rdx_source: String) -> Self {
         let engine = rhai::Engine::new();
 
         // Compile the RDX source once ahead of time
@@ -164,6 +160,23 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                     }
                 });
         });
+
+        //let plugin_clone = SendWrapper::new(self.plugin.clone());
+        //self.engine.register_fn("unlocked", move || {
+        //    let plugin_clone = plugin_clone.deref();
+        //    let mut lock = plugin_clone.lock().unwrap();
+        //    let res = lock.call("unlocked", &[]).unwrap();
+        //    tracing::info!("Locked response: {:?}", res);
+        //    // if res is Some, unwrap and return it. If none, return false.
+        //    res.map(|v| match v {
+        //        Value::Bool(b) => b,
+        //        _ => false,
+        //    })
+        //    .unwrap_or(false)
+        //});
+
+        // Register all exported functions from the plugin
+        // So they can be used by the Rhai script too
     }
 
     /// Render this plugin's UI into the given ctx
@@ -187,7 +200,11 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
         if let Some(ast) = &self.ast {
             // Get the scope from the plugin and clone it
             let mut scope = {
-                let plugin = self.plugin.lock().unwrap();
+                let Ok(plugin) = self.plugin.lock() else {
+                    tracing::error!("Failed to lock plugin");
+                    return;
+                };
+
                 plugin.store().data().clone().into_scope()
             };
 
@@ -196,6 +213,14 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             // call register_fn("render") and render the UI.
             if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
                 error!("Failed to execute script: {:?}", e);
+                // check if e matches  rhai::EvalAltResult::ErrorFunctionNotFound
+                // if so, call register_fn() and try again
+                if let rhai::EvalAltResult::ErrorFunctionNotFound(_, _) = e.as_ref() {
+                    //self.register_fn();
+                    //if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
+                    //    error!("Failed to execute script: {:?}", e);
+                    //}
+                }
             }
             //match self.engine.call_fn::<()>(&mut scope, ast, "tick", ()) {
             //    Ok(_) => tracing::info!("Tick function called"),
@@ -209,7 +234,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
 pub fn render_component<T: Inner + Send + Sync>(
     ui: &mut egui::Ui,
     components: Vec<Component>,
-    plugin: Arc<Mutex<Box<dyn Instantiator<T>>>>,
+    plugin: Arc<Mutex<dyn Instantiator<T>>>,
 ) {
     let content_from_template = |content: String, template: Option<Template>| {
         if let Some(template) = template {
@@ -222,7 +247,6 @@ pub fn render_component<T: Inner + Send + Sync>(
                 .map(|(k, _c, v)| (k, v.to_string()))
                 .collect::<Vec<_>>();
             let ent = template.render(entries);
-            drop(lock);
             ent
         } else {
             content.to_string()
@@ -267,19 +291,22 @@ pub fn render_component<T: Inner + Send + Sync>(
                         let func_args = functions.get(on_click).unwrap();
                         tracing::debug!("Func args {:?}", func_args);
 
-                        let mut lock = plugin.lock().unwrap();
-                        let scope = lock.store().data().scope();
-                        let args = func_args
-                            .iter()
-                            .map(|v| {
-                                Value::String(
-                                    scope.get_value::<String>(v).unwrap_or_default().into(),
-                                )
-                            })
-                            .collect::<Vec<_>>();
+                        let args = {
+                            let lock = plugin.lock().unwrap();
+                            let scope = lock.store().data().scope();
+                            func_args
+                                .iter()
+                                .map(|v| {
+                                    Value::String(
+                                        scope.get_value::<String>(v).unwrap_or_default().into(),
+                                    )
+                                })
+                                .collect::<Vec<_>>()
+                        };
 
                         tracing::debug!("rt'd args {:?}", args);
 
+                        let mut lock = plugin.lock().unwrap();
                         match lock.call(on_click, args.as_slice()) {
                             Ok(res) => {
                                 tracing::info!("on_click response {:?}", res);
@@ -348,7 +375,7 @@ pub fn render_component<T: Inner + Send + Sync>(
                     // Put the value into rhai::Scope as the value of the variable
                     // Can I just linkt he rhai scope variable to the TextEdit widget?
                     let mut lock = plugin.lock().unwrap();
-                    let scope = &mut lock.store_mut().data_mut().scope_mut();
+                    let mut scope = lock.store_mut().data_mut().scope_mut();
 
                     if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
                         let response = ui.add(egui::TextEdit::singleline(&mut val));
@@ -370,6 +397,11 @@ pub fn render_component<T: Inner + Send + Sync>(
                                             )
                                         })
                                         .collect::<Vec<_>>();
+
+                                    drop(scope);
+                                    drop(lock);
+
+                                    let mut lock = plugin.lock().unwrap();
 
                                     if let Ok(value) = lock.call(on_change, args.as_slice()) {
                                         match value {
