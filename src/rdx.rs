@@ -369,6 +369,9 @@ pub fn render_component<T: Inner + Send + Sync>(
                 // 2. Put the rhai::Scope value of that variable into the textEdit.
                 // 3. on TextEdit changed(), update the rhai::Scope value of that variable
 
+                // check whether this is a password TextEdit or not
+                let is_password = props.get("password").map(|s| s.as_str()) == Some("true");
+
                 // Variable name from template value
                 // take the first Dynamic String from the template
                 let var_name = template.as_ref().and_then(|t| {
@@ -386,7 +389,9 @@ pub fn render_component<T: Inner + Send + Sync>(
                     let mut scope = lock.store_mut().data_mut().scope_mut();
 
                     if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
-                        let response = ui.add(egui::TextEdit::singleline(&mut val));
+                        let single_line =
+                            egui::TextEdit::singleline(&mut val).password(is_password);
+                        let response = ui.add(single_line);
                         if response.changed() {
                             // update the scope variable
                             scope.set_or_push(var_name.as_str(), val.clone());
