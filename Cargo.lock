@@ -3228,6 +3228,7 @@ dependencies = [
  "getrandom",
  "js_wasm_runtime_layer",
  "log",
+ "parking_lot",
  "pest",
  "pest_derive",
  "rand",
@@ -3947,6 +3948,7 @@ version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "784e0ac535deb450455cbfa28a6f0df145ea1bb7ae51b821cf5e7927fdcfbdd0"
 dependencies = [
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -4089,6 +4091,16 @@ name = "uuid"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8c5f0a0af699448548ad1a2fbf920fb4bee257eae39953ba95cb84891a0446a"
+
+[[package]]
+name = "validate_rhai_proc_macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "rhai",
+ "syn",
+]
 
 [[package]]
 name = "valuable"

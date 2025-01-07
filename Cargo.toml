@@ -1,6 +1,6 @@
 [workspace]
 members = [
-  ".",
+  ".", "crates/validate_rhai_proc_macro",
   "examples/counter",
   "examples/datetime",
   "examples/login",
@@ -39,7 +39,7 @@ serde = { version = "1", features = ["derive"] }
 
 pest = "2.7"
 pest_derive = "2.7.14"
-tracing = "0.1"
+tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1.0"
 wasm_component_layer = "0.1.18"
@@ -50,6 +50,7 @@ async-trait = "0.1.83"
 anyhow = "1.0.93"
 futures-lite = "2.5.0"
 send_wrapper = "0.6"
+parking_lot = "0.12"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -88,6 +89,7 @@ opt-level = 2
 # If you want to use the bleeding edge version of egui and eframe:
 # egui = { git = "https://github.com/emilk/egui", branch = "master" }
 # eframe = { git = "https://github.com/emilk/egui", branch = "master" }
+
 
 # If you fork https://github.com/emilk/egui you can test with:
 # egui = { path = "../egui/crates/egui" }
