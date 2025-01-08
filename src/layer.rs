@@ -12,12 +12,14 @@ use send_wrapper::SendWrapper;
 pub mod resource_table;
 
 use std::any::Any;
-use std::cell::{Ref, RefMut};
+use std::cell::RefMut;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::pin::Pin;
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Duration, Instant, SystemTime};
@@ -44,26 +46,45 @@ pub use wasmtime_runtime_layer as runtime_layer;
 pub use js_wasm_runtime_layer as runtime_layer;
 
 pub use crate::Error;
+use parking_lot::{lock_api::MutexGuard, RawMutex};
 
-pub enum ScopeRef<'a> {
-    Borrowed(&'a rhai::Scope<'static>),
-    Refcell(Ref<'a, rhai::Scope<'static>>),
+/// Immutable reference to the [rhai::Scope]
+pub enum ScopeRef {
+    Borrowed(Arc<parking_lot::Mutex<rhai::Scope<'static>>>),
+    Refcell(Rc<RefCell<rhai::Scope<'static>>>),
 }
 
-pub enum ScopeRefMut<'a> {
-    Borrowed(&'a mut rhai::Scope<'static>),
-    Refcell(RefMut<'a, rhai::Scope<'static>>),
-}
-
-impl Deref for ScopeRef<'_> {
-    type Target = rhai::Scope<'static>;
+#[cfg(not(target_arch = "wasm32"))]
+impl Deref for ScopeRef {
+    type Target = Arc<parking_lot::Mutex<rhai::Scope<'static>>>;
 
     fn deref(&self) -> &Self::Target {
         match self {
             ScopeRef::Borrowed(scope) => scope,
+            ScopeRef::Refcell(_ref_scope) => {
+                unreachable!()
+            }
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Deref for ScopeRef {
+    type Target = Rc<RefCell<rhai::Scope<'static>>>;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ScopeRef::Borrowed(_) => {
+                unreachable!()
+            }
             ScopeRef::Refcell(ref_scope) => ref_scope,
         }
     }
+}
+
+pub enum ScopeRefMut<'a> {
+    Borrowed(MutexGuard<'a, RawMutex, rhai::Scope<'static>>),
+    Refcell(RefMut<'a, rhai::Scope<'static>>),
 }
 
 impl Deref for ScopeRefMut<'_> {
@@ -87,7 +108,7 @@ impl DerefMut for ScopeRefMut<'_> {
 }
 pub trait Inner {
     /// Update the state with the given key and value
-    fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy);
+    fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Clone);
 
     /// Return the [rhai::Scope]
     fn scope(&self) -> ScopeRef;
@@ -110,17 +131,27 @@ impl poll::Subscribe for Sleep {
     async fn ready(&mut self) {
         #[cfg(not(target_arch = "wasm32"))]
         {
-            tracing::info!("Sleeping until {:?} at {:?}", self.end, Instant::now());
+            tracing::info!(
+                "READY: Sleeping until {:?} at {:?}",
+                self.end,
+                Instant::now()
+            );
             tokio::time::sleep_until(self.end.into()).await;
             tracing::info!("Woke up at {:?}", Instant::now());
         }
 
         #[cfg(target_arch = "wasm32")]
         {
+            tracing::info!(
+                "READY Sleeping until {:?} at {:?}",
+                self.end,
+                Instant::now()
+            );
             send_wrapper::SendWrapper::new(async move {
-                js_sleep(self.end.elapsed().as_millis() as i32)
-                    .await
-                    .unwrap();
+                if let Err(e) = js_sleep(self.end.elapsed().as_millis() as i32).await {
+                    tracing::error!("Error sleeping: {:?}", e);
+                }
+                tracing::info!("READY Woke up at {:?}", Instant::now());
             })
             .await;
         }
@@ -154,14 +185,24 @@ impl Subscribe for Deadline {
             Deadline::Instant(instant) => {
                 #[cfg(not(target_arch = "wasm32"))]
                 {
+                    tracing::info!(
+                        "Deadline: Sleeping until {:?} at {:?}",
+                        instant,
+                        Instant::now()
+                    );
                     tokio::time::sleep_until((*instant).into()).await;
                 }
                 #[cfg(target_arch = "wasm32")]
                 {
+                    tracing::info!(
+                        "Deadline: Sleeping until {:?} at {:?}",
+                        instant,
+                        Instant::now()
+                    );
                     send_wrapper::SendWrapper::new(async move {
-                        js_sleep(instant.elapsed().as_millis() as i32)
-                            .await
-                            .unwrap();
+                        if let Err(e) = js_sleep(instant.elapsed().as_millis() as i32).await {
+                            tracing::error!("Error sleeping: {:?}", e);
+                        }
                     })
                     .await;
                 }
@@ -176,13 +217,16 @@ fn subscribe_to_duration(
     duration: Duration,
 ) -> anyhow::Result<Resource<Pollable>> {
     let sleep = if duration.is_zero() {
+        tracing::info!("subscribe_to_duration: Duration is zero, returning Past");
         table.lock().unwrap().push(Deadline::Past)?
     } else if let Some(deadline) = Instant::now().checked_add(duration) {
+        tracing::info!("subscribe_to_duration: Duration is not zero, returning Instant");
         // NB: this resource created here is not actually exposed to wasm, it's
         // only an internal implementation detail used to match the signature
         // expected by `subscribe`.
         table.lock().unwrap().push(Deadline::Instant(deadline))?
     } else {
+        tracing::info!("subscribe_to_duration: Duration is too far in the future, returning Never");
         // If the user specifies a time so far in the future we can't
         // represent it, wait forever rather than trap.
         table.lock().unwrap().push(Deadline::Never)?
@@ -537,12 +581,16 @@ pub fn instantiate_instance<T: Inner + 'static>(
                         panic!("Incorrect input type.")
                     };
 
+                    tracing::info!("Subscribing to duration: {:?}", millis);
+
                     let resource_pollable =
                         subscribe_to_duration(table_clone.clone(), Duration::from_millis(millis))
                             .map_err(|e| {
                             tracing::error!("Error subscribing to duration: {:?}", e);
                             e
                         })?;
+
+                    tracing::info!("Subscribed to duration");
 
                     let pollable_resource = ResourceOwn::new(
                         &mut store,
@@ -641,29 +689,29 @@ mod tests {
     #[derive(Default)]
     struct State {
         count: rhai::Dynamic,
-        scope: rhai::Scope<'static>,
+        scope: Arc<parking_lot::Mutex<rhai::Scope<'static>>>,
     }
 
     impl Inner for State {
-        fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Copy) {
-            println!("updating {}: {}", key, value.into());
+        fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Clone) {
+            println!("updating {}: {}", key, value.clone().into());
             // set count to value
             // TODO: Chg hard code into rhai scope change
             if key == "count" {
-                self.count = value.into();
+                self.count = value.clone().into();
             }
         }
 
         fn scope(&self) -> ScopeRef {
-            ScopeRef::Borrowed(&self.scope)
+            ScopeRef::Borrowed(self.scope.clone())
         }
 
         fn scope_mut(&mut self) -> ScopeRefMut {
-            ScopeRefMut::Borrowed(&mut self.scope)
+            ScopeRefMut::Borrowed(self.scope.lock())
         }
 
         fn into_scope(self) -> rhai::Scope<'static> {
-            self.scope
+            self.scope.lock().clone()
         }
     }
 

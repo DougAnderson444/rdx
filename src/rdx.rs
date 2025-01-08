@@ -54,14 +54,14 @@ impl RdxApp {
 
 #[derive(Debug, Clone)]
 pub struct State {
-    scope: Scope<'static>,
+    scope: Arc<parking_lot::Mutex<Scope<'static>>>,
     egui_ctx: Option<egui::Context>,
 }
 
 impl State {
     pub fn new(ctx: Option<egui::Context>) -> Self {
         Self {
-            scope: Scope::new(),
+            scope: Arc::new(parking_lot::Mutex::new(Scope::new())),
             egui_ctx: ctx,
         }
     }
@@ -69,8 +69,8 @@ impl State {
 
 impl Inner for State {
     /// Updates the scope variable to the given value
-    fn update(&mut self, key: &str, value: impl Into<Dynamic> + Copy) {
-        self.scope.set_or_push(key, value.into());
+    fn update(&mut self, key: &str, value: impl Into<Dynamic> + Clone) {
+        self.scope.lock().set_or_push(key, value.into());
         if let Some(egui_ctx) = &self.egui_ctx {
             tracing::info!("Requesting repaint");
             egui_ctx.request_repaint();
@@ -81,20 +81,21 @@ impl Inner for State {
     }
 
     fn scope(&self) -> ScopeRef {
-        ScopeRef::Borrowed(&self.scope)
+        ScopeRef::Borrowed(self.scope.clone())
     }
 
     fn scope_mut(&mut self) -> ScopeRefMut {
-        ScopeRefMut::Borrowed(&mut self.scope)
+        ScopeRefMut::Borrowed(self.scope.lock())
     }
 
     // into_scope with 'static lifetime'
     fn into_scope(self) -> rhai::Scope<'static> {
-        self.scope
+        self.scope.lock().clone()
     }
 }
 
-/// The details of a plugin
+/// The plugin and all the details required to run it,
+/// like the [rhai::Engine] and the [egui::Context]
 pub struct PluginDeets<T: Inner + Send> {
     /// The name of the plugin
     name: String,
@@ -111,7 +112,9 @@ pub struct PluginDeets<T: Inner + Send> {
 impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
     /// pass any plugin that impls Instantiator
     pub fn new(name: String, plugin: Arc<Mutex<dyn Instantiator<T>>>, rdx_source: String) -> Self {
-        let engine = rhai::Engine::new();
+        let mut engine = rhai::Engine::new();
+
+        engine.set_max_map_size(500); // allow object maps with only up to 500 properties
 
         // Compile the RDX source once ahead of time
         let ast = match engine.compile(&rdx_source) {
@@ -169,18 +172,28 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                 });
         });
 
+        //#[cfg(target_arch = "wasm32")]
         //let plugin_clone = SendWrapper::new(self.plugin.clone());
+        //#[cfg(not(target_arch = "wasm32"))]
+        //let plugin_clone = self.plugin.clone();
+        //
+        ////let plugin_clone = SendWrapper::new(self.plugin.clone());
         //self.engine.register_fn("unlocked", move || {
-        //    let plugin_clone = plugin_clone.deref();
-        //    let mut lock = plugin_clone.lock().unwrap();
-        //    let res = lock.call("unlocked", &[]).unwrap();
-        //    tracing::info!("Locked response: {:?}", res);
-        //    // if res is Some, unwrap and return it. If none, return false.
-        //    res.map(|v| match v {
-        //        Value::Bool(b) => b,
-        //        _ => false,
-        //    })
-        //    .unwrap_or(false)
+        //    // We need Fn (not FnOnce) because we're calling this function multiple times
+        //    // So we need to clone again inside this closure so that we can call it multiple times
+        //    let plugin_clone_clone = plugin_clone.clone();
+        //
+        //    futures::spawn(async move {
+        //        let mut lock = plugin_clone_clone.lock().unwrap();
+        //        let res = lock.call("unlocked", &[]).unwrap();
+        //        tracing::info!("Locked response: {:?}", res);
+        //        // if res is Some, unwrap and return it. If none, return false.
+        //        res.map(|v| match v {
+        //            Value::Bool(b) => b,
+        //            _ => false,
+        //        })
+        //        .unwrap_or(false);
+        //    });
         //});
 
         // Register all exported functions from the plugin
@@ -239,7 +252,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
 }
 
 /// Render the components of this plugin
-pub fn render_component<T: Inner + Send + Sync>(
+pub fn render_component<T: Inner + Clone + Send + Sync>(
     ui: &mut egui::Ui,
     components: Vec<Component>,
     plugin: Arc<Mutex<dyn Instantiator<T>>>,
@@ -249,7 +262,7 @@ pub fn render_component<T: Inner + Send + Sync>(
             let lock = plugin.lock().unwrap();
             let state = lock.store().data();
             // map the key, is_constant, valure to &str, &str iterator
-            let scope = state.scope();
+            let scope = state.clone().into_scope();
             let entries = scope
                 .iter()
                 .map(|(k, _c, v)| (k, v.to_string()))
@@ -300,8 +313,8 @@ pub fn render_component<T: Inner + Send + Sync>(
                         tracing::debug!("Func args {:?}", func_args);
 
                         let args = {
-                            let lock = plugin.lock().unwrap();
-                            let scope = lock.store().data().scope();
+                            let mut lock = plugin.lock().unwrap();
+                            let scope = lock.store_mut().data_mut().scope_mut();
                             func_args
                                 .iter()
                                 .map(|v| {
@@ -389,8 +402,9 @@ pub fn render_component<T: Inner + Send + Sync>(
                     let mut scope = lock.store_mut().data_mut().scope_mut();
 
                     if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
-                        let single_line =
-                            egui::TextEdit::singleline(&mut val).password(is_password);
+                        let single_line = egui::TextEdit::singleline(&mut val)
+                            .desired_width(f32::INFINITY)
+                            .password(is_password);
                         let response = ui.add(single_line);
                         if response.changed() {
                             // update the scope variable
@@ -431,7 +445,7 @@ pub fn render_component<T: Inner + Send + Sync>(
                             }
                         }
                     } else {
-                        scope.set_or_push(var_name.as_str(), format!("inital {}", var_name));
+                        scope.set_or_push(var_name.as_str(), var_name.to_string());
                     }
 
                     // This doesn't work, see: https://github.com/rhaiscript/rhai/issues/933
