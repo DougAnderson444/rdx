@@ -1,3 +1,19 @@
+use rhai::{Engine, ParseError};
+
+/// Takes the string input, attempts to compile it to Rhai,
+/// returns Ok orthe Rhai compile error.
+pub fn compile_rhai(script: &str) -> Result<(), String> {
+    let engine = Engine::new();
+    if let Err(e) = engine.compile(script) {
+        let ParseError(err_msg, position) = e;
+        let line = position.line().unwrap_or(0);
+        let column = position.position().unwrap_or(0);
+        let error_msg = format!("Rhai compile error at {}:{}: {}", line, column, err_msg);
+        return Err(error_msg);
+    }
+    Ok(())
+}
+
 // /// Utility function to get the workspace dir
 // pub fn workspace_dir() -> PathBuf {
 //     let output = std::process::Command::new(env!("CARGO"))

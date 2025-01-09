@@ -261,8 +261,8 @@ pub fn render_component<T: Inner + Clone + Send + Sync>(
         if let Some(template) = template {
             let lock = plugin.lock().unwrap();
             let state = lock.store().data();
-            // map the key, is_constant, valure to &str, &str iterator
             let scope = state.clone().into_scope();
+            // converts the rhai::Dynamic value to a string
             let entries = scope
                 .iter()
                 .map(|(k, _c, v)| (k, v.to_string()))

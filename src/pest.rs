@@ -68,7 +68,7 @@ impl FromTagName for Component {
                 props,
                 children,
             }),
-            "Vertical" => Some(Component::Vertical {
+            "Vertical" | "div" => Some(Component::Vertical {
                 content,
                 props,
                 children,
@@ -89,7 +89,7 @@ impl FromTagName for Component {
                 functions: functions.unwrap_or_default(),
                 template,
             }),
-            "Text" => Some(Component::Text {
+            "Text" | "p" => Some(Component::Text {
                 content: content.unwrap(),
                 template,
                 props,
@@ -616,6 +616,29 @@ mod tests {
             <Vertical>
                 <Text>My name is {{name}}</Text>
             </Vertical>
+        "#;
+        let res = parse(input).unwrap();
+        assert_eq!(
+            res,
+            vec![Component::Vertical {
+                content: None,
+                props: HashMap::default(),
+                children: vec![Component::Text {
+                    content: "My name is {{name}}".to_string(),
+                    template: Some(Template::new("My name is {{name}}")),
+                    props: HashMap::default(),
+                }]
+            }]
+        );
+    }
+
+    // test the <div> and <p> tags
+    #[test]
+    fn test_div_tag() {
+        let input = r#"
+            <div>
+                <p>My name is {{name}}</p>
+            </div>
         "#;
         let res = parse(input).unwrap();
         assert_eq!(
