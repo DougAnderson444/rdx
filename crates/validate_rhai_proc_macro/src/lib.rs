@@ -1,7 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use rhai::{Engine, ParseError};
-use syn::{parse_macro_input, LitStr};
+use syn::{parse::Parse, parse::ParseStream, Error, Result};
+use syn::{parse_macro_input, Expr, ExprLit, Lit, LitStr};
 
 /// The `validate_rhai` macro takes a string literal as input,
 /// compiles the Rhai script, and returns the input string
@@ -38,4 +39,75 @@ pub fn validate_rhai(input: TokenStream) -> TokenStream {
             })
         }
     }
+}
+
+#[proc_macro]
+pub fn valid_rhai(input: TokenStream) -> TokenStream {
+    let expr = parse_macro_input!(input as Expr);
+
+    // Try to evaluate the expression to a string at compile time
+    let script = match expr_to_string(&expr) {
+        Ok(s) => s,
+        Err(e) => return error_tokens(&format!("Failed to evaluate expression: {}", e)),
+    };
+
+    // Validate the Rhai script
+    let engine = Engine::new();
+    match engine.compile(&script) {
+        Ok(_) => quote! { #expr }.into(),
+        Err(e) => error_tokens(&format!("Rhai compilation error: {}", e)),
+    }
+}
+
+// Helper function t// Helper function to convert expression to string (if possible)
+fn expr_to_string(expr: &Expr) -> Result<String> {
+    match expr {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(s), ..
+        }) => Ok(s.value()),
+        // Handle potential macro expansion results
+        Expr::Macro(expr_macro) => {
+            // This is a simplification. In reality, you'd need to expand the macro
+            // and recursively process its result, which is non-trivial.
+            Err(Error::new_spanned(
+                expr_macro.mac.path.clone(),
+                "Macro expansion not supported",
+            ))
+        }
+        // Handle other types of expressions as needed
+        _ => Err(Error::new_spanned(
+            expr,
+            "Only string literals are supported in this context",
+        )),
+    }
+}
+// Helper function to generate error tokens
+fn error_tokens(msg: &str) -> TokenStream {
+    quote! {
+        compile_error!(#msg);
+    }
+    .into()
+}
+
+struct RhaiRenderInput {
+    wrapper: LitStr,
+    content: Expr,
+}
+
+impl Parse for RhaiRenderInput {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let wrapper = input.parse()?;
+        input.parse::<syn::Token![,]>()?;
+        let content = input.parse()?;
+        Ok(RhaiRenderInput { wrapper, content })
+    }
+}
+
+#[proc_macro]
+pub fn rhai_render(input: TokenStream) -> TokenStream {
+    let expr = parse_macro_input!(input as Expr);
+    let result = quote! {
+        format!("render(\"{}\")", #expr.render())
+    };
+    result.into()
 }
