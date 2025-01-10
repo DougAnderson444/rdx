@@ -51,6 +51,8 @@ futures-lite = "2.5.0"
 send_wrapper = "0.6"
 parking_lot = "0.12"
 scraper = "0.22"
+bon = "3.3"
+html = "0.6"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -72,6 +74,8 @@ web-time = "1.1.0"
 
 [build-dependencies]
 wasmparser = "0.221"
+
+[dev-dependencies]
 
 [profile.release]
 opt-level = 2 # fast and small wasm

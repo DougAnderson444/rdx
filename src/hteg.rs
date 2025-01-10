@@ -1,4 +1,10 @@
 //! HTML to egui (HTEG) converter.and renderer in egui.
+
+mod conversions;
+pub use conversions::{Button, Division};
+
+use std::fmt::Display;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use scraper::{ElementRef, Html, Selector};
@@ -70,8 +76,9 @@ impl<'a> ElementWrapper<'a> {
     /// assert_eq!(func, "increment");
     /// assert_eq!(args, vec!["name"]);
     /// ```
-    fn func_and_args(&self, attr: &str) -> Option<(&str, Vec<&str>)> {
-        let attr = self.element_ref.value().attr(attr)?;
+    fn func_and_args(&self, attr: impl Into<Attribute>) -> Option<(&str, Vec<&str>)> {
+        let attr: Attribute = attr.into();
+        let attr = self.element_ref.value().attr(&attr)?;
         let splits = attr.split('(').collect::<Vec<_>>();
 
         let func_name = splits[0];
@@ -89,7 +96,6 @@ impl<'a> ElementWrapper<'a> {
             })
             .collect::<Vec<_>>();
 
-        eprintln!("func_and_args: {:?} {:?}", func_name, func_args);
         Some((func_name, func_args))
     }
 }
@@ -124,6 +130,159 @@ impl HtmlElement {
             "p" => HtmlElement::Paragraph,
             _ => HtmlElement::Div,
         }
+    }
+}
+
+/// Enumerate the action handlers, such as on-click, on-change, etc.
+///
+/// The action handlers are attributed as data-on-click, data-on-change, etc,
+/// since data attributes must begin with `data-`. then the actual
+/// function name comes after.
+///
+/// This enum enumerates the 'on-click', 'on-change', etc. so that
+/// the html crate can use this enum to build the html text programmatically
+/// in a type safe way, without typo errors.
+pub enum Action {
+    OnClick,
+    OnChange,
+}
+
+impl Action {
+    // Define constants for the attribute strings
+    const ON_CLICK: &'static str = "on-click";
+    const ON_CHANGE: &'static str = "on-change";
+
+    // Method to get the string representation
+    fn as_str(&self) -> &'static str {
+        match self {
+            Action::OnClick => Self::ON_CLICK,
+            Action::OnChange => Self::ON_CHANGE,
+        }
+    }
+}
+
+impl From<Action> for Attribute {
+    fn from(val: Action) -> Self {
+        match val {
+            Action::OnClick => Attribute::DataOnClick,
+            Action::OnChange => Attribute::DataOnChange,
+        }
+    }
+}
+
+impl From<Action> for &'static str {
+    fn from(val: Action) -> Self {
+        val.as_str()
+    }
+}
+
+impl From<Action> for String {
+    fn from(val: Action) -> Self {
+        val.as_str().to_string()
+    }
+}
+
+// impl into std::borrow::Cow<'static, str>>
+impl From<Action> for std::borrow::Cow<'static, str> {
+    fn from(val: Action) -> Self {
+        val.as_str().into()
+    }
+}
+
+impl Deref for Action {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+/// These are the data attibutes asscoiated with the action handlers.
+enum Attribute {
+    DataOnClick,
+    DataOnChange,
+}
+
+impl Attribute {
+    // Define constants for the attribute strings
+    const DATA_ON_CLICK: &'static str = "data-on-click";
+    const DATA_ON_CHANGE: &'static str = "data-on-change";
+
+    // Method to get the string representation
+    fn as_str(&self) -> &'static str {
+        match self {
+            Attribute::DataOnClick => Self::DATA_ON_CLICK,
+            Attribute::DataOnChange => Self::DATA_ON_CHANGE,
+        }
+    }
+}
+
+impl From<Attribute> for &'static str {
+    fn from(val: Attribute) -> Self {
+        val.as_str()
+    }
+}
+
+impl From<Attribute> for String {
+    fn from(val: Attribute) -> Self {
+        val.as_str().to_string()
+    }
+}
+
+impl From<Attribute> for std::borrow::Cow<'static, str> {
+    fn from(val: Attribute) -> Self {
+        val.as_str().into()
+    }
+}
+
+impl Deref for Attribute {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+/// Type to represent a handler function_name(maybe, some, args) in the html attribute,
+/// in response to an [Action].
+/// This is used to type check the function name and the arguments in the html
+///
+/// # Example
+/// ```rust
+/// # use rdx::hteg::Handler;
+/// let func = Handler::builder()
+///    .named("increment".to_owned())
+///    .args(vec!["key".to_owned(), "value".to_owned()])
+///    .build();
+///
+/// // Handler automatically converts into a string
+/// assert_eq!(func.to_string(), "increment(key, value)");
+#[derive(bon::Builder, Debug)]
+pub struct Handler {
+    named: String,
+    args: Option<Vec<String>>,
+}
+
+impl Display for Handler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = self.named.clone();
+        s.push('(');
+        if let Some(args) = &self.args {
+            for (i, arg) in args.iter().enumerate() {
+                s.push_str(arg);
+                if i < args.len() - 1 {
+                    s.push_str(", ");
+                }
+            }
+        }
+        s.push(')');
+        write!(f, "{}", s)
+    }
+}
+
+impl From<Handler> for std::borrow::Cow<'static, str> {
+    fn from(val: Handler) -> Self {
+        val.to_string().into()
     }
 }
 
@@ -179,7 +338,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
 
             let text = element.text().collect::<String>();
             if ui.add(egui::Button::new(&text).fill(color)).clicked() {
-                if let Some((on_click, func_args)) = elw.func_and_args("data-on-click") {
+                if let Some((on_click, func_args)) = elw.func_and_args(Action::OnClick) {
                     let args = {
                         let mut lock = plugin.lock().unwrap();
                         let scope = lock.store_mut().data_mut().scope_mut();
@@ -245,7 +404,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                     scope.set_value(var_name.as_str(), val.clone());
 
                     // also call the on_change function if it exists
-                    if let Some((on_change, func_args)) = elw.func_and_args("data-on-change") {
+                    if let Some((on_change, func_args)) = elw.func_and_args(Action::OnClick) {
                         // if on_change is not empty, call the function
                         if !on_change.is_empty() {
                             let args = func_args
@@ -347,7 +506,7 @@ mod tests {
 
         for element in fragment.select(&button_1p_selector) {
             let elw = ElementWrapper::new(element);
-            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            let (func, args) = elw.func_and_args(Action::OnClick).unwrap();
             assert_eq!(func, "increment");
             assert_eq!(args, vec!["key"]);
         }
@@ -356,7 +515,7 @@ mod tests {
 
         for element in fragment.select(&button_2p_selector) {
             let elw = ElementWrapper::new(element);
-            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            let (func, args) = elw.func_and_args(Action::OnClick).unwrap();
             assert_eq!(func, "decrement");
             assert_eq!(args, vec!["key", "value"]);
         }
@@ -365,9 +524,140 @@ mod tests {
 
         for element in fragment.select(&button_3p_selector) {
             let elw = ElementWrapper::new(element);
-            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            let (func, args) = elw.func_and_args(Action::OnClick).unwrap();
             assert_eq!(func, "reset");
             assert!(args.is_empty());
         }
+    }
+
+    // We should be able to use the html crate and the types in hteg to build type safe tests, same
+    // as above.
+    #[test]
+    fn test_render_element() {
+        use html::forms::Button;
+        use html::text_content::Division;
+        use html::text_content::Paragraph;
+
+        let html_expected = r#"<div><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><p>Click to Start counting!</p></div>"#;
+
+        let html = Division::builder()
+            .push(
+                Button::builder()
+                    .id("button1")
+                    .data(Action::OnClick, "increment(key)")
+                    .text("Increment")
+                    .build(),
+            )
+            .push(
+                Button::builder()
+                    .id("button2")
+                    .data(Action::OnClick, "decrement(key, value)")
+                    .text("Decrement")
+                    .build(),
+            )
+            .push(
+                Paragraph::builder()
+                    .text("Click to Start counting!")
+                    .build(),
+            )
+            .build();
+
+        assert_eq!(html.to_string(), html_expected);
+
+        let fragment = Html::parse_fragment(&html.to_string());
+
+        let div_selector = Selector::parse("button#button1").unwrap();
+
+        for element in fragment.select(&div_selector) {
+            let elw = ElementWrapper::new(element);
+            let (func, args) = elw.func_and_args(Attribute::DataOnClick).unwrap();
+            assert_eq!(func, "increment");
+            assert_eq!(args, vec!["key"]);
+        }
+    }
+
+    #[test]
+    fn test_render_element_builders() {
+        use html::forms::Button;
+        use html::text_content::Division;
+        use html::text_content::Paragraph;
+
+        let html_expected = r#"<div><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><button id="button3" data-on-click="reset()">Reset</button><p>Click to Start counting!</p></div>"#;
+
+        let html = Division::builder()
+            .push(
+                // We save 1 line and enforce type safety by using new_with_func()
+                conversions::Button::new_with_func(
+                    Action::OnClick,
+                    Handler::builder()
+                        .named("increment".to_owned())
+                        .args(vec!["key".to_owned()])
+                        .build(),
+                )
+                .id("button1")
+                .text("Increment")
+                .build(),
+            )
+            .push(
+                Button::builder()
+                    .data(
+                        Action::OnClick,
+                        Handler::builder()
+                            .named("decrement".to_owned())
+                            .args(vec!["key".to_owned(), "value".to_owned()])
+                            .build(),
+                    )
+                    .id("button2")
+                    .text("Decrement")
+                    .build(),
+            )
+            .push(
+                Button::builder()
+                    .id("button3")
+                    .data(
+                        Action::OnClick,
+                        Handler::builder().named("reset".to_owned()).build(),
+                    )
+                    .text("Reset")
+                    .build(),
+            )
+            .push(
+                Paragraph::builder()
+                    .text("Click to Start counting!")
+                    .build(),
+            )
+            .build();
+
+        assert_eq!(html.to_string(), html_expected);
+
+        let fragment = Html::parse_fragment(&html.to_string());
+
+        let div_selector = Selector::parse("button#button1").unwrap();
+
+        for element in fragment.select(&div_selector) {
+            let elw = ElementWrapper::new(element);
+            let (func, args) = elw.func_and_args(Action::OnClick).unwrap();
+            assert_eq!(func, "increment");
+            assert_eq!(args, vec!["key"]);
+        }
+
+        let div_selector = Selector::parse("button#button2").unwrap();
+
+        let element = fragment.select(&div_selector).next().unwrap();
+
+        let elw = ElementWrapper::new(element);
+        let (func, args) = elw.func_and_args(Action::OnClick).unwrap();
+        assert_eq!(func, "decrement");
+        assert_eq!(args, vec!["key", "value"]);
+
+        let div_selector = Selector::parse("button#button3").unwrap();
+
+        let element = fragment.select(&div_selector).next().unwrap();
+
+        let elw = ElementWrapper::new(element);
+        // We can also use Attribute::DataOnClick here
+        let (func, args) = elw.func_and_args(Attribute::DataOnClick).unwrap();
+        assert_eq!(func, "reset");
+        assert!(args.is_empty());
     }
 }

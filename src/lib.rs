@@ -1,3 +1,4 @@
+#![recursion_limit = "512"] // for the html testing
 #![warn(clippy::all)]
 #![allow(static_mut_refs)] // dirs crate has warnings that break the CI build.
 
