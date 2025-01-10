@@ -1,5 +1,9 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 name: CI Rust Workflow
 
