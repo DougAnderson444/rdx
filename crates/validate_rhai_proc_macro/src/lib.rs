@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use rhai::{Engine, ParseError};
-use syn::{parse::Parse, parse::ParseStream, Error, Result};
 use syn::{parse_macro_input, Expr, ExprLit, Lit, LitStr};
+use syn::{Error, Result};
 
 /// The `validate_rhai` macro takes a string literal as input,
 /// compiles the Rhai script, and returns the input string
@@ -87,27 +87,4 @@ fn error_tokens(msg: &str) -> TokenStream {
         compile_error!(#msg);
     }
     .into()
-}
-
-struct RhaiRenderInput {
-    wrapper: LitStr,
-    content: Expr,
-}
-
-impl Parse for RhaiRenderInput {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let wrapper = input.parse()?;
-        input.parse::<syn::Token![,]>()?;
-        let content = input.parse()?;
-        Ok(RhaiRenderInput { wrapper, content })
-    }
-}
-
-#[proc_macro]
-pub fn rhai_render(input: TokenStream) -> TokenStream {
-    let expr = parse_macro_input!(input as Expr);
-    let result = quote! {
-        format!("render(\"{}\")", #expr.render())
-    };
-    result.into()
 }
