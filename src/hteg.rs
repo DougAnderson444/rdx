@@ -51,50 +51,78 @@ impl<'a> ElementWrapper<'a> {
     fn html_element(&self) -> &HtmlElement {
         &self.html_element
     }
+
+    /// Returns a tuple of the functions and arguments for the given attribute.
+    ///
+    /// The attribute value is expected to be in the format `function_name(arg1, arg2, arg3)`.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use crate::hteg::ElementWrapper;
+    /// # use scraper::{Html, Selector};
+    /// let html = r#"<div data-on-click="increment(name)">...</div>"#;
+    /// let fragment = Html::parse_fragment(html);
+    /// let div_selector = Selector::parse("div").unwrap();
+    /// let element = fragment.select(&div_selector).next().unwrap();
+    /// let elw = ElementWrapper::new(element);
+    /// let attr = "data-on-click";
+    /// let (func, args) = elw.func_and_args(attr).unwrap();
+    /// assert_eq!(func, "increment");
+    /// assert_eq!(args, vec!["name"]);
+    /// ```
+    fn func_and_args(&self, attr: &str) -> Option<(&str, Vec<&str>)> {
+        let attr = self.element_ref.value().attr(attr)?;
+        let splits = attr.split('(').collect::<Vec<_>>();
+
+        let func_name = splits[0];
+        let func_args = splits[1]
+            .trim_end_matches(')')
+            .split(',')
+            // mao on trim for whitespace, and filter on non-empty strings
+            .filter_map(|v| {
+                let v_trimmed = v.trim();
+                if v_trimmed.is_empty() {
+                    None
+                } else {
+                    Some(v_trimmed)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        eprintln!("func_and_args: {:?} {:?}", func_name, func_args);
+        Some((func_name, func_args))
+    }
 }
 
 /// Enum to represent the HTML elements that can be rendered into egui UI components.
 pub enum HtmlElement {
     /// Represents a div element. Divs are converted to [egui::Ui::vertical] by default.
-    Div(Vec<Attribute>),
+    Div,
     /// Represents a button element. Buttons are converted to [egui::Button].
-    Button(Vec<Attribute>),
+    Button,
     /// Represents an input element. Inputs are converted to [egui::TextEdit].
-    Input(Vec<Attribute>),
+    Input,
     /// Represents a label element. Labels are converted to [egui::RichText].
-    Label(Vec<Attribute>),
+    Label,
     /// Represents a span element. Spans are converted to [egui::RichText].
-    Span(Vec<Attribute>),
+    Span,
     /// Paragraph element. Paragraphs are converted to [egui::RichText].
-    Paragraph(Vec<Attribute>),
-}
-
-pub struct Attribute {
-    name: String,
-    value: String,
+    Paragraph,
 }
 
 impl HtmlElement {
     /// Creates a new [HtmlElement] from the given [scraper::ElementRef].
     pub fn from_element(element: &ElementRef) -> Self {
         let tag_name = element.value().name();
-        let attributes = element
-            .value()
-            .attrs()
-            .map(|(name, value)| Attribute {
-                name: name.to_string(),
-                value: value.to_string(),
-            })
-            .collect::<Vec<_>>();
 
         match tag_name {
-            "div" => HtmlElement::Div(attributes),
-            "button" => HtmlElement::Button(attributes),
-            "input" => HtmlElement::Input(attributes),
-            "label" => HtmlElement::Label(attributes),
-            "span" => HtmlElement::Span(attributes),
-            "p" => HtmlElement::Paragraph(attributes),
-            _ => HtmlElement::Div(attributes),
+            "div" => HtmlElement::Div,
+            "button" => HtmlElement::Button,
+            "input" => HtmlElement::Input,
+            "label" => HtmlElement::Label,
+            "span" => HtmlElement::Span,
+            "p" => HtmlElement::Paragraph,
+            _ => HtmlElement::Div,
         }
     }
 }
@@ -106,22 +134,6 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
     element: ElementRef,
     plugin: Arc<Mutex<dyn Instantiator<T>>>,
 ) -> Result<(), Error> {
-    // helper closure to get the function and its arguments from the element's attribute
-    let func_and_args = |attr: &str| -> Option<(&str, Vec<&str>)> {
-        match element.value().attr(attr) {
-            Some(attr) => {
-                let func_and_args = attr.split('(').collect::<Vec<_>>();
-                let on_click = func_and_args[0];
-                let func_args = func_and_args[1]
-                    .split(',')
-                    .map(|v| v.trim())
-                    .collect::<Vec<_>>();
-                Some((on_click, func_args))
-            }
-            None => None,
-        }
-    };
-
     // fill the content template with scope values
     let content = {
         let content = element.text().collect::<String>();
@@ -140,7 +152,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
 
     let elw = ElementWrapper::new(element);
     match elw.html_element() {
-        HtmlElement::Div(_attrs) if elw.matches("div.flex-row")? => {
+        HtmlElement::Div if elw.matches("div.flex-row")? => {
             ui.horizontal(|ui| {
                 for child in element.child_elements() {
                     if let Err(e) = render_element(ui, child, plugin.clone()) {
@@ -149,7 +161,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                 }
             });
         }
-        HtmlElement::Div(_attrs) => {
+        HtmlElement::Div => {
             ui.vertical(|ui| {
                 for child in element.child_elements() {
                     if let Err(e) = render_element(ui, child, plugin.clone()) {
@@ -158,7 +170,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                 }
             });
         }
-        HtmlElement::Button(_attrs) => {
+        HtmlElement::Button => {
             let color = match element.value().attr("color") {
                 Some("green") => egui::Color32::from_rgb(100, 200, 100),
                 Some("red") => egui::Color32::from_rgb(200, 100, 100),
@@ -167,7 +179,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
 
             let text = element.text().collect::<String>();
             if ui.add(egui::Button::new(&text).fill(color)).clicked() {
-                if let Some((on_click, func_args)) = func_and_args("data-on-click") {
+                if let Some((on_click, func_args)) = elw.func_and_args("data-on-click") {
                     let args = {
                         let mut lock = plugin.lock().unwrap();
                         let scope = lock.store_mut().data_mut().scope_mut();
@@ -204,7 +216,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
             }
             ui.add_space(4.0);
         }
-        HtmlElement::Input(_attrs) => {
+        HtmlElement::Input => {
             let is_password = element.value().attr("password") == Some("true");
 
             // get the first TemplatPart::Dynamic from template.parts.iter()
@@ -233,18 +245,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                     scope.set_value(var_name.as_str(), val.clone());
 
                     // also call the on_change function if it exists
-                    if let Some(on_change_val) = element.value().attr("data-on-change") {
-                        // get the fn and its args, example <div data-on-change="handle_change(arg1, arg2)">...</div>
-                        // it' a vec of strings ["handle_change", "arg1, arg2)"]
-                        // split by '(' and ','
-                        let func_and_args = on_change_val.split('(').collect::<Vec<_>>();
-                        let on_change = func_and_args[0];
-                        let func_args = func_and_args[1]
-                            .split(',')
-                            // trim any whitespace, front and/or end
-                            .map(|v| v.trim())
-                            .collect::<Vec<_>>();
-
+                    if let Some((on_change, func_args)) = elw.func_and_args("data-on-change") {
                         // if on_change is not empty, call the function
                         if !on_change.is_empty() {
                             let args = func_args
@@ -279,7 +280,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                 scope.set_value(var_name.as_str(), var_name.to_string());
             }
         }
-        HtmlElement::Label(_attrs) | HtmlElement::Span(_attrs) | HtmlElement::Paragraph(_attrs) => {
+        HtmlElement::Label | HtmlElement::Span | HtmlElement::Paragraph => {
             let size = match element.value().attr("size") {
                 Some("small") => 14.0,
                 Some("large") => 18.0,
@@ -326,6 +327,47 @@ mod tests {
                 }
                 _ => {}
             }
+        }
+    }
+
+    // test func_and_args
+    #[test]
+    fn test_func_and_args() {
+        let html = r#"
+            <div>
+                <button id=button1 data-on-click="increment(key)">Increment</button>
+                <button id=button2 data-on-click="decrement(key, value)">Decrement</button>
+                <button id=button3 data-on-click="reset()">Reset</button>
+                <p>Click to Start counting!</p>
+            </div>
+        "#;
+
+        let fragment = Html::parse_fragment(html);
+        let button_1p_selector = Selector::parse("button#button1").unwrap();
+
+        for element in fragment.select(&button_1p_selector) {
+            let elw = ElementWrapper::new(element);
+            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            assert_eq!(func, "increment");
+            assert_eq!(args, vec!["key"]);
+        }
+
+        let button_2p_selector = Selector::parse("button#button2").unwrap();
+
+        for element in fragment.select(&button_2p_selector) {
+            let elw = ElementWrapper::new(element);
+            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            assert_eq!(func, "decrement");
+            assert_eq!(args, vec!["key", "value"]);
+        }
+
+        let button_3p_selector = Selector::parse("button#button3").unwrap();
+
+        for element in fragment.select(&button_3p_selector) {
+            let elw = ElementWrapper::new(element);
+            let (func, args) = elw.func_and_args("data-on-click").unwrap();
+            assert_eq!(func, "reset");
+            assert!(args.is_empty());
         }
     }
 }
