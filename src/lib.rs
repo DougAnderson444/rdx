@@ -18,7 +18,7 @@ mod error;
 pub use error::Error;
 
 /// HTML to egui (HTEG)
-mod hteg;
+pub mod hteg;
 
 mod futures;
 pub mod layer;

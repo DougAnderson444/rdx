@@ -48,7 +48,7 @@ impl Guest for Counter {
         } else {
 
             render(`
-                <div>
+                <div class="flex flex-row">
                     <button data-on-click="increment()">Increment</button>
                     <button data-on-click="decrement()">Decrement</button>
                     <span>Count is: {{count}}</span>

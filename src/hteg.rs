@@ -1,4 +1,4 @@
-//! HTML to egui converter.and renderer in egui.
+//! HTML to egui (HTEG) converter.and renderer in egui.
 use std::sync::{Arc, Mutex};
 
 use scraper::{ElementRef, Html, Selector};
@@ -16,11 +16,87 @@ pub fn parse_and_render<T: Inner + Clone + Send + Sync>(
     plugin: Arc<Mutex<dyn Instantiator<T>>>,
 ) -> Result<(), Error> {
     let fragment = Html::parse_fragment(html);
-    let top_selector = Selector::parse("div")?;
+    let top_selector = Selector::parse("html")?;
     for element in fragment.select(&top_selector) {
-        render_element(ui, element, plugin.clone());
+        render_element(ui, element, plugin.clone())?;
     }
     Ok(())
+}
+
+/// Wrapper struct to hold the [scraper::ElementRef] and the [HtmlElement] that
+/// is being rendered into egui UI components.
+struct ElementWrapper<'a> {
+    html_element: HtmlElement,
+    element_ref: ElementRef<'a>,
+}
+
+impl<'a> ElementWrapper<'a> {
+    /// Creates a new [ElementWrapper] from the given [scraper::ElementRef].
+    fn new(element_ref: ElementRef<'a>) -> Self {
+        let html_element = HtmlElement::from_element(&element_ref);
+        ElementWrapper {
+            html_element,
+            element_ref,
+        }
+    }
+
+    /// Determines if this element matches the given selector.
+    fn matches(&self, selector: &str) -> Result<bool, Error> {
+        let selectors = Selector::parse(selector).map_err(|e| Error::Parse(e.to_string()))?;
+        let m = selectors.matches(&self.element_ref);
+        Ok(m)
+    }
+
+    /// Returns teh [HtmlElement]
+    fn html_element(&self) -> &HtmlElement {
+        &self.html_element
+    }
+}
+
+/// Enum to represent the HTML elements that can be rendered into egui UI components.
+pub enum HtmlElement {
+    /// Represents a div element. Divs are converted to [egui::Ui::vertical] by default.
+    Div(Vec<Attribute>),
+    /// Represents a button element. Buttons are converted to [egui::Button].
+    Button(Vec<Attribute>),
+    /// Represents an input element. Inputs are converted to [egui::TextEdit].
+    Input(Vec<Attribute>),
+    /// Represents a label element. Labels are converted to [egui::RichText].
+    Label(Vec<Attribute>),
+    /// Represents a span element. Spans are converted to [egui::RichText].
+    Span(Vec<Attribute>),
+    /// Paragraph element. Paragraphs are converted to [egui::RichText].
+    Paragraph(Vec<Attribute>),
+}
+
+pub struct Attribute {
+    name: String,
+    value: String,
+}
+
+impl HtmlElement {
+    /// Creates a new [HtmlElement] from the given [scraper::ElementRef].
+    pub fn from_element(element: &ElementRef) -> Self {
+        let tag_name = element.value().name();
+        let attributes = element
+            .value()
+            .attrs()
+            .map(|(name, value)| Attribute {
+                name: name.to_string(),
+                value: value.to_string(),
+            })
+            .collect::<Vec<_>>();
+
+        match tag_name {
+            "div" => HtmlElement::Div(attributes),
+            "button" => HtmlElement::Button(attributes),
+            "input" => HtmlElement::Input(attributes),
+            "label" => HtmlElement::Label(attributes),
+            "span" => HtmlElement::Span(attributes),
+            "p" => HtmlElement::Paragraph(attributes),
+            _ => HtmlElement::Div(attributes),
+        }
+    }
 }
 
 /// Recurive function that walks the [scraper::ElementRef] and turns the
@@ -29,7 +105,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
     ui: &mut egui::Ui,
     element: ElementRef,
     plugin: Arc<Mutex<dyn Instantiator<T>>>,
-) {
+) -> Result<(), Error> {
     // helper closure to get the function and its arguments from the element's attribute
     let func_and_args = |attr: &str| -> Option<(&str, Vec<&str>)> {
         match element.value().attr(attr) {
@@ -45,8 +121,6 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
             None => None,
         }
     };
-
-    let tag_name = element.value().name();
 
     // fill the content template with scope values
     let content = {
@@ -64,15 +138,27 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
         template.render(entries)
     };
 
-    match tag_name {
-        "div" => {
-            ui.vertical(|ui| {
+    let elw = ElementWrapper::new(element);
+    match elw.html_element() {
+        HtmlElement::Div(_attrs) if elw.matches("div.flex-row")? => {
+            ui.horizontal(|ui| {
                 for child in element.child_elements() {
-                    render_element(ui, child, plugin.clone());
+                    if let Err(e) = render_element(ui, child, plugin.clone()) {
+                        tracing::error!("Error rendering child element: {:?}", e);
+                    }
                 }
             });
         }
-        "button" => {
+        HtmlElement::Div(_attrs) => {
+            ui.vertical(|ui| {
+                for child in element.child_elements() {
+                    if let Err(e) = render_element(ui, child, plugin.clone()) {
+                        tracing::error!("Error rendering child element: {:?}", e);
+                    }
+                }
+            });
+        }
+        HtmlElement::Button(_attrs) => {
             let color = match element.value().attr("color") {
                 Some("green") => egui::Color32::from_rgb(100, 200, 100),
                 Some("red") => egui::Color32::from_rgb(200, 100, 100),
@@ -118,7 +204,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
             }
             ui.add_space(4.0);
         }
-        "input" => {
+        HtmlElement::Input(_attrs) => {
             let is_password = element.value().attr("password") == Some("true");
 
             // get the first TemplatPart::Dynamic from template.parts.iter()
@@ -128,7 +214,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
             let template = Template::new(element.value().attr("value").unwrap_or_default());
             let Some(TemplatePart::Dynamic(var_name)) = template.parts.first() else {
                 // nowhere to save the input, returning early
-                return;
+                return Err(Error::Parse("No variable name found".to_string()));
             };
 
             // Get the value of the variable from the rhai::Scope
@@ -193,7 +279,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                 scope.set_value(var_name.as_str(), var_name.to_string());
             }
         }
-        "p" | "label" | "span" => {
+        HtmlElement::Label(_attrs) | HtmlElement::Span(_attrs) | HtmlElement::Paragraph(_attrs) => {
             let size = match element.value().attr("size") {
                 Some("small") => 14.0,
                 Some("large") => 18.0,
@@ -203,10 +289,8 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
             ui.label(egui::RichText::new(content).size(size));
             ui.add_space(4.0);
         }
-        _ => {
-            //tracing::warn!("Unknown tag: {}", tag_name);
-        }
     }
+    Ok(())
 }
 
 #[cfg(test)]
