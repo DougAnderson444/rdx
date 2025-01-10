@@ -38,21 +38,21 @@ impl Guest for Counter {
         if !is_def_var("count") || count == "0" {
 
             render(`
-                <Vertical>
-                    <Button on_click=increment()>Increment</Button>
-                    <Button on_click=decrement()>Decrement</Button>
-                    <Label>Click to Start counting!</Label>
-                </Vertical>
+                <div>
+                    <button data-on-click="increment()">Increment</button>
+                    <button data-on-click="decrement()">Decrement</button>
+                    <p>Click to Start counting!</p>
+                </div>
             `)
 
         } else {
 
             render(`
-                <Vertical>
-                    <Button on_click=increment()>Increment</Button>
-                    <Button on_click=decrement()>Decrement</Button>
-                    <Label>Count is: {{count}}</Label>
-                </Vertical>
+                <div>
+                    <button data-on-click="increment()">Increment</button>
+                    <button data-on-click="decrement()">Decrement</button>
+                    <span>Count is: {{count}}</span>
+                </div>
             `)
 
         }

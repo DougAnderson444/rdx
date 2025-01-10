@@ -27,10 +27,10 @@ impl Guest for Component {
         r#"
         // call the system function `render` on the template with the ctx from scope
             render(`
-                <Vertical>
-                    <Label>Seconds since unix was invented: {{datetime}}</Label>
-                    <Button on_click=ticker()>1s Refresh</Button>
-                </Vertical>
+                <div>
+                    <span>Seconds since unix was invented: {{datetime}}</span>
+                    <button data-on-click="ticker()">1s Refresh</button>
+                </div>
             `)
         "#
         .to_string()

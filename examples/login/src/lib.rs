@@ -8,18 +8,18 @@ use bindings::exports::component::plugin::run::Guest;
 struct Component;
 
 // static LOGIN_SCREEN: &str = r#"
-//     <Vertical>
-//         <TextEdit on_change=username()>{{username}}</TextEdit>
-//         <TextEdit on_change=password()>{{password}}</TextEdit>
+//     <div>
+//         <input on_change=username()>{{username}}</input>
+//         <input on_change=password()>{{password}}</input>
 //         <Button on_click=login()>Login</Button>
-//     </Vertical>
+//     </div>
 // "#;
 //
 // static LOGGED_IN_SCREEN: &str = r#"
-//     <Vertical>
+//     <div>
 //         <Text>Welcome, {{username}}!</Text>
 //         <Button on_click=logout()>Logout</Button>
-//     </Vertical>
+//     </div>
 // "#;
 
 impl Guest for Component {
@@ -48,11 +48,11 @@ impl Guest for Component {
         r#"
         // call the system function `render` on the template with the ctx from scope
         render(`
-            <Vertical>
-                <TextEdit on_change=username(username)>{{username}}</TextEdit>
-                <TextEdit on_change=password(password)>{{password}}</TextEdit>
-                <Button on_click=login()>Login</Button>
-            </Vertical>
+            <div id="login1">
+                <input value="{{username}}" data-on-change="username(username)">
+                <input value="{{password}}" data-on-change="password(password)">
+                <button on_click=login()>Login</button>
+            </div>
         `)
         "#
         .to_string()

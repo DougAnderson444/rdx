@@ -25,7 +25,11 @@ Because we need a way to encapsulate full stack apps into WebAssembly, so they c
 RDX is a combination of: 
 
 1. Rhai (for control flow logic) and 
-2. 🆕 egui markdown (for User Interface). 
+2. html subset (for User Interface). 
+
+In RDX, the html gets parsed then rendered into egui user interface components.
+
+Using HTML gives RDX authors access to great crates such as [html](https://docs.rs/html/latest/html/) for type safety, and [render](https://docs.rs/render/latest/render/) for composable html components.
 
 For [example](./examples/counter/src/lib.rs), It looks something like this:
 
@@ -39,11 +43,11 @@ if !is_def_var("count") || count == "0" {
     // the render function returns a string of RDX
     // render is provided by the rhai scope by default
     render(ctx, `
-        <Vertical>
-            <Button on_click=increment()>Increment</Button>
-            <Button on_click=decrement()>Decrement</Button>
-            <Label>Click to Start counting!</Label>
-        </Vertical>
+        <div>
+            <button data-on-click="increment()">Increment</button>
+            <button data-on-click="decrement()">Decrement</button>
+            <label>Click to Start counting!</label>
+        </div>
     `)
 
 } else {
@@ -51,11 +55,11 @@ if !is_def_var("count") || count == "0" {
     // alternate RDX if count is not 0 
     // the {{count}} is a variable stored in rhai scope
     render(ctx, `
-        <Vertical>
-            <Button on_click=increment()>Increment</Button>
-            <Button on_click=decrement()>Decrement</Button>
-            <Label>Count is: {{count}}</Label>
-        </Vertical>
+        <div>
+            <button data-on-click="increment()">Increment</button>
+            <button data-on-click="decrement()">Decrement</button>
+            <label>Count is: {{count}}</label>
+        </div>
     `)
 
 }

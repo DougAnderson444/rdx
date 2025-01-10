@@ -3,9 +3,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::hteg::parse_and_render;
 use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
-use crate::pest::{parse, Component};
-use crate::template::{Template, TemplatePart};
 
 use rhai::{Dynamic, Scope};
 use tracing::error;
@@ -147,26 +146,21 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             return;
         };
 
-        self.engine.register_fn("render", move |text: &str| {
+        self.engine.register_fn("render", move |html: &str| {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
             egui::Window::new(name.clone())
                 .resizable(true)
                 .show(&ctx, |ui| {
-                    // TODO: We're re-parsing the RDX every time we render.
-                    // This could be done using a HashMap of RDX strings to
-                    // LazyLock to ensure it's only parsed once.
-
-                    // unwrap the sendwrapper to get the plugin
+                    // [browser]: unwrap the sendwrapper to get the plugin
                     #[cfg(target_arch = "wasm32")]
                     let plugin_clone = plugin_clone.deref();
 
-                    if let Ok(components) = parse(text) {
-                        render_component(ui, components, plugin_clone.clone());
-                    } else {
+                    if let Err(e) = parse_and_render(ui, html, plugin_clone.clone()) {
                         tracing::error!(
-                            "Failed to parse RDX source for plugin: {}, source {}",
+                            "Failed to parse RDX source for plugin: {}, source {} with error: {:?}",
                             name,
-                            text
+                            html,
+                            e
                         );
                     }
                 });
@@ -247,218 +241,6 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             //    Ok(_) => tracing::info!("Tick function called"),
             //    Err(_) => tracing::error!("Failed to call tick function"),
             //}
-        }
-    }
-}
-
-/// Render the components of this plugin
-pub fn render_component<T: Inner + Clone + Send + Sync>(
-    ui: &mut egui::Ui,
-    components: Vec<Component>,
-    plugin: Arc<Mutex<dyn Instantiator<T>>>,
-) {
-    let content_from_template = |content: String, template: Option<Template>| {
-        if let Some(template) = template {
-            let lock = plugin.lock().unwrap();
-            let state = lock.store().data();
-            let scope = state.clone().into_scope();
-            // converts the rhai::Dynamic value to a string
-            let entries = scope
-                .iter()
-                .map(|(k, _c, v)| (k, v.to_string()))
-                .collect::<Vec<_>>();
-
-            template.render(entries)
-        } else {
-            content.to_string()
-        }
-    };
-
-    for component in components {
-        match component {
-            Component::Vertical { children, .. } => {
-                ui.vertical(|ui| {
-                    render_component(ui, children, plugin.clone());
-                });
-            }
-            Component::Horizontal { children, .. } => {
-                ui.horizontal(|ui| {
-                    render_component(ui, children, plugin.clone());
-                });
-            }
-            Component::Button {
-                content,
-                props,
-                functions,
-            } => {
-                let color = match props.get("color").map(|s| s.as_str()) {
-                    Some("green") => egui::Color32::from_rgb(100, 200, 100),
-                    Some("red") => egui::Color32::from_rgb(200, 100, 100),
-                    _ => ui.style().visuals.widgets.active.bg_fill,
-                };
-
-                let text = content.clone().unwrap_or("".to_string());
-                if ui.add(egui::Button::new(&text).fill(color)).clicked() {
-                    if let Some(on_click) = props.get("on_click") {
-                        // if we had to call Rhai to execute the function:
-                        //
-                        // self.engine
-                        //     .eval_with_scope::<Dynamic>(
-                        //         &mut self.scope.lock().unwrap(),
-                        //         on_click,
-                        //     )
-                        //     .ok();
-                        tracing::debug!("On click {:?}", on_click);
-                        let func_args = functions.get(on_click).unwrap();
-                        tracing::debug!("Func args {:?}", func_args);
-
-                        let args = {
-                            let mut lock = plugin.lock().unwrap();
-                            let scope = lock.store_mut().data_mut().scope_mut();
-                            func_args
-                                .iter()
-                                .map(|v| {
-                                    Value::String(
-                                        scope.get_value::<String>(v).unwrap_or_default().into(),
-                                    )
-                                })
-                                .collect::<Vec<_>>()
-                        };
-
-                        tracing::debug!("rt'd args {:?}", args);
-
-                        let mut lock = plugin.lock().unwrap();
-                        match lock.call(on_click, args.as_slice()) {
-                            Ok(res) => {
-                                tracing::info!("on_click response {:?}", res);
-                            }
-                            Err(e) => {
-                                error!("on_click Error {:?}", e);
-                            }
-                        }
-                    }
-                }
-                ui.add_space(4.0);
-            }
-            Component::Label {
-                content,
-                props,
-                template,
-            } => {
-                let size = match props.get("size").map(|s| s.as_str()) {
-                    Some("small") => 14.0,
-                    Some("large") => 18.0,
-                    _ => 16.0,
-                };
-
-                let content = content_from_template(content, template);
-
-                ui.label(egui::RichText::new(content).size(size));
-                ui.add_space(4.0);
-            }
-            Component::Text {
-                content,
-                props,
-                template,
-            } => {
-                let content = content_from_template(content, template);
-
-                let size = match props.get("size").map(|s| s.as_str()) {
-                    Some("small") => 14.0,
-                    Some("large") => 18.0,
-                    _ => 16.0,
-                };
-
-                ui.label(egui::RichText::new(content.clone()).size(size));
-                ui.add_space(4.0);
-            }
-            Component::TextEdit {
-                props,
-                functions,
-                template,
-                ..
-            } => {
-                // 1. Get the variable from the template Dynamic String (there should only be one)
-                // 2. Put the rhai::Scope value of that variable into the textEdit.
-                // 3. on TextEdit changed(), update the rhai::Scope value of that variable
-
-                // check whether this is a password TextEdit or not
-                let is_password = props.get("password").map(|s| s.as_str()) == Some("true");
-
-                // Variable name from template value
-                // take the first Dynamic String from the template
-                let var_name = template.as_ref().and_then(|t| {
-                    t.parts.iter().find_map(|part| match part {
-                        TemplatePart::Dynamic(s) => Some(s),
-                        _ => None,
-                    })
-                });
-
-                if let Some(var_name) = var_name {
-                    // Get the value of the variable from the rhai::Scope
-                    // Put the value into rhai::Scope as the value of the variable
-                    // Can I just linkt he rhai scope variable to the TextEdit widget?
-                    let mut lock = plugin.lock().unwrap();
-                    let mut scope = lock.store_mut().data_mut().scope_mut();
-
-                    if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
-                        let single_line = egui::TextEdit::singleline(&mut val)
-                            .desired_width(f32::INFINITY)
-                            .password(is_password);
-                        let response = ui.add(single_line);
-                        if response.changed() {
-                            // update the scope variable
-                            scope.set_or_push(var_name.as_str(), val.clone());
-
-                            // also call the on_change function
-                            if let Some(on_change) = props.get("on_change") {
-                                if let Some(func_args) = functions.get(on_change) {
-                                    let args = func_args
-                                        .iter()
-                                        .map(|v| {
-                                            Value::String(
-                                                scope
-                                                    .get_value::<String>(v)
-                                                    .unwrap_or_default()
-                                                    .into(),
-                                            )
-                                        })
-                                        .collect::<Vec<_>>();
-
-                                    drop(scope);
-                                    drop(lock);
-
-                                    let mut lock = plugin.lock().unwrap();
-
-                                    if let Ok(value) = lock.call(on_change, args.as_slice()) {
-                                        match value {
-                                            Some(Value::String(_s)) => {
-                                                // TODO: act on return value(s)?
-                                            }
-                                            Some(Value::Bool(_)) => {}
-                                            _ => {}
-                                        }
-                                    } else {
-                                        error!("Failed to call on_change function: {}", on_change);
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        scope.set_or_push(var_name.as_str(), var_name.to_string());
-                    }
-
-                    // This doesn't work, see: https://github.com/rhaiscript/rhai/issues/933
-                    // if let Some(var_ptr) = scope.get_value_mut::<String>(var_name.as_str()) {
-                    //     ui.text_edit_singleline(var_ptr);
-                    // } else {
-                    //     tracing::error!("Failed to get var: {}", var_name);
-                    //     scope.set_or_push(var_name.as_str(), format!("inital {}", var_name));
-                    // }
-                }
-
-                ui.add_space(4.0);
-            }
         }
     }
 }

@@ -32,17 +32,17 @@ impl Guest for Component {
         // call the system function `render` on the template with the ctx from scope
         if !is_def_var("number") {
             render(`
-                <Vertical>
-                    <Label>Click to generate a Random number</Label>
-                    <Button on_click=random()>Generate</Button>
-                </Vertical>
+                <div>
+                    <span>Click to generate a Random number</span>
+                    <button data-on-click="random()">Generate</button>
+                </div>
             `)
         } else {
             render(`
-                <Vertical>
-                    <Label>Random number is: {{number}}</Label>
-                    <Button on_click=random()>Re-Generate</Button>
-                </Vertical>
+                <div>
+                    <span>Random number is: {{number}}</span>
+                    <button data-on-click="random()">Re-Generate</button>
+                </div>
             `)
         }
         "#

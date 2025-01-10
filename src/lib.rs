@@ -17,7 +17,8 @@ pub use wasm_component_layer;
 mod error;
 pub use error::Error;
 
-mod pest;
+/// HTML to egui (HTEG)
+mod hteg;
 
 mod futures;
 pub mod layer;

@@ -87,6 +87,17 @@ mod tests {
 
     use super::*;
 
+    // test content without any {{brackets}} returns its original self
+    #[test]
+    fn test_no_replacements() {
+        let template = Template::new("This is a template");
+        let values: HashMap<&str, &str> = HashMap::<&str, &str>::new();
+
+        let result = template.render(values.iter().map(|(k, v)| (*k, v.to_string())));
+
+        assert_eq!(result, "This is a template");
+    }
+
     #[test]
     fn test_template() {
         let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
