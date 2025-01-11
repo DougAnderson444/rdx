@@ -584,20 +584,20 @@ mod tests {
 
         let html_expected = r#"<div><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><button id="button3" data-on-click="reset()">Reset</button><p>Click to Start counting!</p></div>"#;
 
-        let html = Division::builder()
-            .push(
-                // We save 1 line and enforce type safety by using new_with_func()
-                conversions::Button::new_with_func(
-                    Action::OnClick,
-                    Handler::builder()
-                        .named("increment".to_owned())
-                        .args(vec!["key".to_owned()])
-                        .build(),
-                )
-                .id("button1")
-                .text("Increment")
+        // We save 1 line and enforce type safety by using new_with_func()
+        let button = conversions::Button::new_with_func(
+            Action::OnClick,
+            Handler::builder()
+                .named("increment".to_owned())
+                .args(vec!["key".to_owned()])
                 .build(),
-            )
+        )
+        .id("button1")
+        .text("Increment")
+        .build();
+
+        let html = Division::builder()
+            .push(button)
             .push(
                 Button::builder()
                     .data(

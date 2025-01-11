@@ -44,12 +44,16 @@ impl Division {
     /// use rdx::hteg::Handler;
     /// use rdx::hteg::Division;
     ///
-    /// let mut div = Division::new_with_func(Action::OnClick,
-    ///                        Handler::builder()
-    ///                            .named("increment".to_owned())
-    ///                            .args(vec!["key".to_owned()])
-    ///                            .build());
-    /// div.build();
+    /// let mut div = Division::new_with_func(
+    ///     Action::OnClick,
+    ///     Handler::builder()
+    ///         .named("increment".to_owned())
+    ///         .args(vec!["key".to_owned()])
+    ///         .build(),
+    /// )
+    /// .build();
+    ///
+    /// assert_eq!(div.to_string(), "<div data-on-click=\"increment(key)\"></div>");
     /// ```
     pub fn new_with_func(action: crate::hteg::Action, func: crate::hteg::Handler) -> Self {
         let mut div = Self::default();
@@ -60,6 +64,29 @@ impl Division {
 
 /// Button NewType wrapper around [html::text_content::Button]
 /// to enforce the use of [crate::hteg::Action] for actions, and [crate::hteg::Handler] for functions.
+///
+/// All other [html] methods are passed through.
+///
+/// # Example
+/// ```rust
+/// #![recursion_limit = "512"]
+/// use rdx::hteg::Button;
+/// use rdx::hteg::{Action, Handler};
+///
+/// let button = Button::new_with_func(
+///     Action::OnClick,
+///     Handler::builder()
+///         .named("increment".to_owned())
+///         .args(vec!["key".to_owned()])
+///         .build(),
+/// )
+/// // now we can use [html::text_content::Button] methods to add more optional details
+/// .id("button1")
+/// .text("Increment")
+/// .build();
+///
+/// assert_eq!(button.to_string(), "<button id=\"button1\" data-on-click=\"increment(key)\">Increment</button>");
+/// ```
 pub struct Button(html::forms::builders::ButtonBuilder);
 
 impl Default for Button {
