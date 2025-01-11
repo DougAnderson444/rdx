@@ -98,9 +98,9 @@ pub mod exports {
                 }
                 #[doc(hidden)]
                 #[allow(non_snake_case)]
-                pub unsafe fn _export_increment_cabi<T: Guest>() -> i32 {
+                pub unsafe fn _export_increment_count_cabi<T: Guest>() -> i32 {
                     #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
-                    let result0 = T::increment();
+                    let result0 = T::increment_count();
                     _rt::as_i32(result0)
                 }
                 #[doc(hidden)]
@@ -121,7 +121,7 @@ pub mod exports {
                     /// Returns the RDX script.
                     fn load() -> _rt::String;
                     /// Increments the counter.
-                    fn increment() -> i32;
+                    fn increment_count() -> i32;
                     /// Decrements the counter.
                     fn decrement() -> i32;
                     /// Returns the current counter value.
@@ -136,9 +136,9 @@ pub mod exports {
                         = "cabi_post_component:plugin/run#load"] unsafe extern "C" fn
                         _post_return_load(arg0 : * mut u8,) { $($path_to_types)*::
                         __post_return_load::<$ty > (arg0) } #[export_name =
-                        "component:plugin/run#increment"] unsafe extern "C" fn
-                        export_increment() -> i32 { $($path_to_types)*::
-                        _export_increment_cabi::<$ty > () } #[export_name =
+                        "component:plugin/run#increment-count"] unsafe extern "C" fn
+                        export_increment_count() -> i32 { $($path_to_types)*::
+                        _export_increment_count_cabi::<$ty > () } #[export_name =
                         "component:plugin/run#decrement"] unsafe extern "C" fn
                         export_decrement() -> i32 { $($path_to_types)*::
                         _export_decrement_cabi::<$ty > () } #[export_name =
@@ -266,16 +266,16 @@ pub(crate) use __export_plugin_world_impl as export;
 #[cfg(target_arch = "wasm32")]
 #[link_section = "component-type:wit-bindgen:0.35.0:component:plugin:plugin-world:encoded world"]
 #[doc(hidden)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 400] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x8d\x02\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 406] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\x93\x02\x01A\x02\x01\
 A\x08\x01B\x02\x01r\x02\x04names\x05values\x04\0\x05event\x03\0\0\x03\0\x16compo\
 nent:plugin/types\x05\0\x02\x03\0\0\x05event\x03\0\x05event\x03\0\x01\x01B\x04\x02\
 \x03\x02\x01\x01\x04\0\x05event\x03\0\0\x01@\x01\x03evt\x01\x01\0\x04\0\x04emit\x01\
 \x02\x03\0\x15component:plugin/host\x05\x03\x01B\x06\x01@\0\0s\x04\0\x04load\x01\
-\0\x01@\0\0z\x04\0\x09increment\x01\x01\x04\0\x09decrement\x01\x01\x04\0\x07curr\
-ent\x01\x01\x04\0\x14component:plugin/run\x05\x04\x04\0\x1dcomponent:plugin/plug\
-in-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0cproc\
-essed-by\x02\x0dwit-component\x070.220.0\x10wit-bindgen-rust\x060.35.0";
+\0\x01@\0\0z\x04\0\x0fincrement-count\x01\x01\x04\0\x09decrement\x01\x01\x04\0\x07\
+current\x01\x01\x04\0\x14component:plugin/run\x05\x04\x04\0\x1dcomponent:plugin/\
+plugin-world\x04\0\x0b\x12\x01\0\x0cplugin-world\x03\0\0\0G\x09producers\x01\x0c\
+processed-by\x02\x0dwit-component\x070.220.0\x10wit-bindgen-rust\x060.35.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

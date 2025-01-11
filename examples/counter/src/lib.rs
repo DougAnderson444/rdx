@@ -1,8 +1,9 @@
+#![recursion_limit = "512"]
 #[allow(warnings)]
 mod bindings;
 
-use std::sync::LazyLock;
-use std::sync::Mutex;
+use html_to_egui::{Action, Button, DivSelectors, Division, Handler, Paragraph};
+use std::sync::{LazyLock, Mutex};
 
 use bindings::component::plugin::host::emit;
 use bindings::component::plugin::types::Event;
@@ -28,40 +29,68 @@ struct Counter;
 impl Guest for Counter {
     /// Say hello!
     fn load() -> String {
-        r#"
-        // call the system function `render` on the template with the ctx from scope
-        
-        // wasm functions are bound to the rhai script on load?
-        // let count = current(); // TODO: register all exported functions with rhai engine
-        // let count = 0;
+        let increment_button = Button::new_with_func(
+            Action::OnClick,
+            // the function name must match the wasm function name in this file
+            // converted into kebab-case (so my_function becomes my-function)
+            Handler::builder()
+                .named("increment-count".to_string())
+                .build(),
+        )
+        .text("Increment")
+        .build();
 
-        if !is_def_var("count") || count == "0" {
+        let decrement_button = Button::new_with_func(
+            Action::OnClick,
+            Handler::builder().named("decrement".to_string()).build(),
+        )
+        .text("Decrement")
+        .build();
 
-            render(`
-                <div>
-                    <button data-on-click="increment()">Increment</button>
-                    <button data-on-click="decrement()">Decrement</button>
-                    <p>Click to Start counting!</p>
-                </div>
-            `)
+        let no_def_count_para = Paragraph::builder()
+            .text("Click to Start counting!")
+            .build();
 
-        } else {
+        let def_count_para = Paragraph::builder().text("Count is: {{count}}").build();
 
-            render(`
-                <div class="flex flex-row">
-                    <button data-on-click="increment()">Increment</button>
-                    <button data-on-click="decrement()">Decrement</button>
-                    <span>Count is: {{count}}</span>
-                </div>
-            `)
+        let def_count = Division::builder()
+            .push(increment_button.clone())
+            .push(decrement_button.clone())
+            .push(def_count_para)
+            .class(DivSelectors::FlexRow)
+            .build()
+            .to_string();
 
-        }
+        let no_def_count = Division::builder()
+            .push(increment_button)
+            .push(decrement_button)
+            .push(no_def_count_para)
+            .build()
+            .to_string();
+
+        format!(
+            r#"
+            // call the system function `render` on the template with the ctx from scope
+            
+            // wasm functions are bound to the rhai script on load?
+            // let count = current(); // TODO: register all exported functions with rhai engine
+            // let count = 0;
+
+            if !is_def_var("count") || count == "0" {{
+
+                render(`{no_def_count}`)
+
+            }} else {{
+
+                render(`{def_count}`)
+
+            }}
         "#
-        .to_string()
+        )
     }
 
     /// Increment the count
-    fn increment() -> i32 {
+    fn increment_count() -> i32 {
         // let mut count = COUNTER.count;
         // count += 1;
         //
@@ -100,5 +129,43 @@ impl Guest for Counter {
         // COUNTER.count
 
         *COUNT.lock().unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn test_string_interpolation() {
+        let def_count = "a {{test}} string";
+
+        let test = format!(
+            r#"
+        // call the system function `render` on the template with the ctx from scope
+        
+        // wasm functions are bound to the rhai script on load?
+        // let count = current(); // TODO: register all exported functions with rhai engine
+        // let count = 0;
+
+        if !is_def_var("count") || count == "0" {{
+
+            render(`{def_count}`)
+
+        }} else {{
+
+            render(`
+                <div class="flex flex-row">
+                    <button data-on-click="increment()">Increment</button>
+                    <button data-on-click="decrement()">Decrement</button>
+                    <!-- inline template vars need double double {{}}'s -->
+                    <span>Count is: {{{{count}}}}</span>
+                </div>
+            `)
+
+        }}
+        "#
+        );
+
+        eprintln!("{}", test);
     }
 }

@@ -896,6 +896,7 @@ dependencies = [
 name = "counter"
 version = "0.1.0"
 dependencies = [
+ "html-to-egui",
  "thiserror",
  "wasmtime 25.0.3",
  "wasmtime-wasi",
@@ -2160,6 +2161,14 @@ name = "html-sys"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13eca55667a5657dd1b86db77c5fe2d1810e3f9413e9555a2c4c461733dd2573"
+
+[[package]]
+name = "html-to-egui"
+version = "0.1.0"
+dependencies = [
+ "bon",
+ "html",
+]
 
 [[package]]
 name = "html5ever"
@@ -3464,13 +3473,13 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
- "bon",
  "eframe",
  "egui",
  "env_logger",
  "futures-lite",
  "getrandom",
  "html",
+ "html-to-egui",
  "js_wasm_runtime_layer",
  "log",
  "parking_lot",

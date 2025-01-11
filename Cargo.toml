@@ -1,6 +1,7 @@
 [workspace]
 members = [
   ".",
+  "crates/html-to-egui",
   "crates/validate_rhai_proc_macro",
   "examples/counter",
   "examples/datetime",
@@ -51,8 +52,8 @@ futures-lite = "2.5.0"
 send_wrapper = "0.6"
 parking_lot = "0.12"
 scraper = "0.22"
-bon = "3.3"
 html = "0.6"
+html-to-egui = { path = "crates/html-to-egui" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"

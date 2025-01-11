@@ -22,7 +22,7 @@ interface run {
   load: func() -> string;
 
   /// Increments the counter.
-  increment: func() -> s32;
+  increment-count: func() -> s32;
 
   /// Decrements the counter.
   decrement: func() -> s32;

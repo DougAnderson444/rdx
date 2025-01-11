@@ -1,10 +1,7 @@
 //! HTML to egui (HTEG) converter.and renderer in egui.
 
-mod conversions;
-pub use conversions::{Button, Division};
+use html_to_egui::{Action, Attribute, DivSelectors};
 
-use std::fmt::Display;
-use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
 use scraper::{ElementRef, Html, Selector};
@@ -46,12 +43,12 @@ impl<'a> ElementWrapper<'a> {
         }
     }
 
-    /// Determines if this element matches the given selector.
-    fn matches(&self, selector: &str) -> Result<bool, Error> {
-        let selectors = Selector::parse(selector).map_err(|e| Error::Parse(e.to_string()))?;
-        let m = selectors.matches(&self.element_ref);
-        Ok(m)
-    }
+    ///// Determines if this element matches the given selector.
+    //fn matches(&self, selector: &str) -> Result<bool, Error> {
+    //    let selectors = Selector::parse(selector).map_err(|e| Error::Parse(e.to_string()))?;
+    //    let m = selectors.matches(&self.element_ref);
+    //    Ok(m)
+    //}
 
     /// Returns teh [HtmlElement]
     fn html_element(&self) -> &HtmlElement {
@@ -101,9 +98,9 @@ impl<'a> ElementWrapper<'a> {
 }
 
 /// Enum to represent the HTML elements that can be rendered into egui UI components.
-pub enum HtmlElement {
+enum HtmlElement {
     /// Represents a div element. Divs are converted to [egui::Ui::vertical] by default.
-    Div,
+    Div(DivSelectors),
     /// Represents a button element. Buttons are converted to [egui::Button].
     Button,
     /// Represents an input element. Inputs are converted to [egui::TextEdit].
@@ -121,174 +118,33 @@ impl HtmlElement {
     pub fn from_element(element: &ElementRef) -> Self {
         let tag_name = element.value().name();
 
+        let class_selectors = element.value().attr("class").unwrap_or_default();
+
         match tag_name {
-            "div" => HtmlElement::Div,
+            "div" => {
+                if class_selectors.contains(&*DivSelectors::FlexRow)
+                    || Selector::parse(&DivSelectors::FlexRow)
+                        .unwrap()
+                        .matches(element)
+                {
+                    HtmlElement::Div(DivSelectors::FlexRow)
+                } else {
+                    HtmlElement::Div(DivSelectors::None)
+                }
+            }
             "button" => HtmlElement::Button,
             "input" => HtmlElement::Input,
             "label" => HtmlElement::Label,
             "span" => HtmlElement::Span,
             "p" => HtmlElement::Paragraph,
-            _ => HtmlElement::Div,
+            _ => HtmlElement::Div(DivSelectors::None),
         }
-    }
-}
-
-/// Enumerate the action handlers, such as on-click, on-change, etc.
-///
-/// The action handlers are attributed as data-on-click, data-on-change, etc,
-/// since data attributes must begin with `data-`. then the actual
-/// function name comes after.
-///
-/// This enum enumerates the 'on-click', 'on-change', etc. so that
-/// the html crate can use this enum to build the html text programmatically
-/// in a type safe way, without typo errors.
-pub enum Action {
-    OnClick,
-    OnChange,
-}
-
-impl Action {
-    // Define constants for the attribute strings
-    const ON_CLICK: &'static str = "on-click";
-    const ON_CHANGE: &'static str = "on-change";
-
-    // Method to get the string representation
-    fn as_str(&self) -> &'static str {
-        match self {
-            Action::OnClick => Self::ON_CLICK,
-            Action::OnChange => Self::ON_CHANGE,
-        }
-    }
-}
-
-impl From<Action> for Attribute {
-    fn from(val: Action) -> Self {
-        match val {
-            Action::OnClick => Attribute::DataOnClick,
-            Action::OnChange => Attribute::DataOnChange,
-        }
-    }
-}
-
-impl From<Action> for &'static str {
-    fn from(val: Action) -> Self {
-        val.as_str()
-    }
-}
-
-impl From<Action> for String {
-    fn from(val: Action) -> Self {
-        val.as_str().to_string()
-    }
-}
-
-// impl into std::borrow::Cow<'static, str>>
-impl From<Action> for std::borrow::Cow<'static, str> {
-    fn from(val: Action) -> Self {
-        val.as_str().into()
-    }
-}
-
-impl Deref for Action {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-/// These are the data attibutes asscoiated with the action handlers.
-enum Attribute {
-    DataOnClick,
-    DataOnChange,
-}
-
-impl Attribute {
-    // Define constants for the attribute strings
-    const DATA_ON_CLICK: &'static str = "data-on-click";
-    const DATA_ON_CHANGE: &'static str = "data-on-change";
-
-    // Method to get the string representation
-    fn as_str(&self) -> &'static str {
-        match self {
-            Attribute::DataOnClick => Self::DATA_ON_CLICK,
-            Attribute::DataOnChange => Self::DATA_ON_CHANGE,
-        }
-    }
-}
-
-impl From<Attribute> for &'static str {
-    fn from(val: Attribute) -> Self {
-        val.as_str()
-    }
-}
-
-impl From<Attribute> for String {
-    fn from(val: Attribute) -> Self {
-        val.as_str().to_string()
-    }
-}
-
-impl From<Attribute> for std::borrow::Cow<'static, str> {
-    fn from(val: Attribute) -> Self {
-        val.as_str().into()
-    }
-}
-
-impl Deref for Attribute {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-/// Type to represent a handler function_name(maybe, some, args) in the html attribute,
-/// in response to an [Action].
-/// This is used to type check the function name and the arguments in the html
-///
-/// # Example
-/// ```rust
-/// # use rdx::hteg::Handler;
-/// let func = Handler::builder()
-///    .named("increment".to_owned())
-///    .args(vec!["key".to_owned(), "value".to_owned()])
-///    .build();
-///
-/// // Handler automatically converts into a string
-/// assert_eq!(func.to_string(), "increment(key, value)");
-#[derive(bon::Builder, Debug)]
-pub struct Handler {
-    named: String,
-    args: Option<Vec<String>>,
-}
-
-impl Display for Handler {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = self.named.clone();
-        s.push('(');
-        if let Some(args) = &self.args {
-            for (i, arg) in args.iter().enumerate() {
-                s.push_str(arg);
-                if i < args.len() - 1 {
-                    s.push_str(", ");
-                }
-            }
-        }
-        s.push(')');
-        write!(f, "{}", s)
-    }
-}
-
-impl From<Handler> for std::borrow::Cow<'static, str> {
-    fn from(val: Handler) -> Self {
-        val.to_string().into()
     }
 }
 
 /// Recurive function that walks the [scraper::ElementRef] and turns the
 /// HTML into egui UI components.
-pub fn render_element<T: Inner + Clone + Send + Sync>(
+fn render_element<T: Inner + Clone + Send + Sync>(
     ui: &mut egui::Ui,
     element: ElementRef,
     plugin: Arc<Mutex<dyn Instantiator<T>>>,
@@ -311,7 +167,8 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
 
     let elw = ElementWrapper::new(element);
     match elw.html_element() {
-        HtmlElement::Div if elw.matches("div.flex-row")? => {
+        // TODO: Add selectors to Div
+        HtmlElement::Div(DivSelectors::FlexRow) => {
             ui.horizontal(|ui| {
                 for child in element.child_elements() {
                     if let Err(e) = render_element(ui, child, plugin.clone()) {
@@ -320,7 +177,7 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
                 }
             });
         }
-        HtmlElement::Div => {
+        HtmlElement::Div(DivSelectors::None) => {
             ui.vertical(|ui| {
                 for child in element.child_elements() {
                     if let Err(e) = render_element(ui, child, plugin.clone()) {
@@ -457,6 +314,8 @@ pub fn render_element<T: Inner + Clone + Send + Sync>(
 mod tests {
     use super::*;
 
+    use html_to_egui::Handler;
+
     #[test]
     fn test_parse_and_render() {
         let html = r#"
@@ -578,14 +437,12 @@ mod tests {
 
     #[test]
     fn test_render_element_builders() {
-        use html::forms::Button;
-        use html::text_content::Division;
-        use html::text_content::Paragraph;
+        use html_to_egui::{Button, Division, Paragraph};
 
-        let html_expected = r#"<div><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><button id="button3" data-on-click="reset()">Reset</button><p>Click to Start counting!</p></div>"#;
+        let html_expected = r#"<div class="flex-row"><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><button id="button3" data-on-click="reset()">Reset</button><p>Click to Start counting!</p></div>"#;
 
         // We save 1 line and enforce type safety by using new_with_func()
-        let button = conversions::Button::new_with_func(
+        let button = Button::new_with_func(
             Action::OnClick,
             Handler::builder()
                 .named("increment".to_owned())
@@ -626,6 +483,7 @@ mod tests {
                     .text("Click to Start counting!")
                     .build(),
             )
+            .class(DivSelectors::FlexRow)
             .build();
 
         assert_eq!(html.to_string(), html_expected);
