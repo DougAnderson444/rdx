@@ -97,7 +97,7 @@ mod test_mod_echo {
         // get the target/wasm32-wasi/debug/CARGO_PKG_NAME.wasm file
         let pkg_name = std::env::var("CARGO_PKG_NAME")?.replace('-', "_");
         let workspace = workspace_dir();
-        let wasm_path = format!("target/wasm32-unknown-unknown/debug/{}.wasm", pkg_name);
+        let wasm_path = format!("target/wasm32-unknown-unknown/release/{}.wasm", pkg_name);
         let wasm_path = workspace.join(wasm_path);
 
         let mut config = Config::new();
@@ -154,7 +154,7 @@ mod test_mod_echo {
         assert_eq!(c_2, 2);
 
         // should be able to get_func "increment" behind the exported interface provider and call it.
-        let name = "increment";
+        let name = "increment-count";
 
         let instance = linker
             .instantiate(store.as_context_mut(), &component)
