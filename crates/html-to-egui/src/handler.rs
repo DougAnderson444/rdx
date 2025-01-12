@@ -7,7 +7,7 @@ use super::*;
 ///
 /// # Example
 /// ```rust
-/// # use rdx::hteg::Handler;
+/// # use html_to_egui::Handler;
 /// let func = Handler::builder()
 ///    .named("increment".to_owned())
 ///    .args(vec!["key".to_owned(), "value".to_owned()])

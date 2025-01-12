@@ -99,28 +99,28 @@ macro_rules! impl_hteg {
                 Self::default()
             }
 
-            /// Additonal method which takes an [Action] and [Handler]
-            /// then calls applies them the the builder in a type safe way.
-            #[doc = concat!("
-            # Example
-            ```rust
-            #![recursion_limit = \"512\"]
-
-            use html_to_egui::{Action, Handler};
-            use html_egui_bindgen::", stringify!($name), ";
-
-            let mut tag = ", stringify!($name), "::new_with_func(
-                Action::OnClick,
-                Handler::builder()
-                    .named(\"increment\".to_owned())
-                    .args(vec![\"key\".to_owned()])
-                    .build(),
-            )
-            .id(\"my-id\".to_owned())
-            .class(\"my-class\".to_owned())
-            .build();
-            ```
-            ")]
+            #[doc = concat!(
+                "Additonal method which takes an [Action] and [Handler]\n",
+                "then calls applies them the the builder in a type safe way.\n",
+                "# Example\n",
+                "```rust\n",
+                "#![recursion_limit = \"512\"]\n",
+                "\n",
+                "use html_to_egui::{Action, Handler};\n",
+                "use html_egui_bindgen::", stringify!($name), ";\n",
+                "\n",
+                "let mut tag = ", stringify!($name), "::new_with_func(\n",
+                "    Action::OnClick,\n",
+                "    Handler::builder()\n",
+                "        .named(\"increment\".to_owned())\n",
+                "        .args(vec![\"key\".to_owned()])\n",
+                "        .build(),\n",
+                ")\n",
+                ".id(\"my-id\".to_owned())\n",
+                ".class(\"my-class\".to_owned())\n",
+                ".build();\n",
+                "```\n"
+            )]
             pub fn new_with_func(action: Action, func: Handler) -> Self {
                 let mut div = Self::default();
                 div.data(action, func);
