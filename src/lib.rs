@@ -1,5 +1,6 @@
 #![warn(clippy::all)]
 #![allow(static_mut_refs)] // dirs crate has warnings that break the CI build.
+#![cfg_attr(test, recursion_limit = "512")]
 
 // The build file results, builtin components, are included in the build script
 // Build files are for the demos, so the wasm binaries can be included by default in the build

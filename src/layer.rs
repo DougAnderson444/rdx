@@ -743,7 +743,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         // call the increment function
-        let func = export_instance.func("increment").unwrap();
+        let func = export_instance.func("increment-count").unwrap();
 
         const CAPACITY: usize = 1;
         let mut results = [Value::Bool(false); CAPACITY];
@@ -772,7 +772,7 @@ mod tests {
 
         let mut plugin = LayerPlugin::new(WASM, data);
 
-        let _ = plugin.call("increment", &[]).unwrap();
+        let _ = plugin.call("increment-count", &[]).unwrap();
 
         // current
         let result = plugin.call("current", &[]).unwrap();
