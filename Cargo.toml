@@ -52,7 +52,7 @@ anyhow = "1.0.93"
 futures-lite = "2.5.0"
 send_wrapper = "0.6"
 parking_lot = "0.12"
-scraper = "0.22"
+scraper = { version = "0.22", default-features = false }
 html-to-egui = { path = "crates/html-to-egui" }
 
 # For native builds:
