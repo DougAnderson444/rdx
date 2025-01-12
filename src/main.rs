@@ -30,9 +30,19 @@ async fn main() -> eframe::Result {
     )
 }
 
+// dlmalloc breaks with scraper crate in wasm32 builds.
+// wee_alloc leaks and is unmaintained.
+// lol_alloc is new but has a lot of potential. See: https://nickb.dev/blog/avoiding-allocations-in-rust-to-shrink-wasm-modules/
+// talc was mentioned as an alternative to lol_alloc. Sadly I couldn't get talc to work with my
+// wasm32 setup.
+// See: // See: https://github.com/rustwasm/wee_alloc/issues/107#issuecomment-1820233830
+#[cfg(target_arch = "wasm32")]
+use lol_alloc::{AssumeSingleThreaded, FreeListAllocator};
+
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc<'_> = wee_alloc::WeeAlloc::INIT;
+static ALLOCATOR: AssumeSingleThreaded<FreeListAllocator> =
+    unsafe { AssumeSingleThreaded::new(FreeListAllocator::new()) };
 
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]

@@ -74,7 +74,7 @@ js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 web-time = "1.1.0"
-wee_alloc = "0.4.5"
+lol_alloc = "0.4.1"
 
 [build-dependencies]
 wasmparser = "0.221"
