@@ -27,8 +27,7 @@ struct Counter;
 impl Guest for Counter {
     /// Say hello!
     fn load() -> String {
-        let rhai_str = include_str!(concat!(env!("OUT_DIR"), "/counter.rhai"));
-        rhai_str.to_string()
+        include_str!(concat!(env!("OUT_DIR"), "/counter.rhai")).to_string()
     }
 
     /// Increment the count
