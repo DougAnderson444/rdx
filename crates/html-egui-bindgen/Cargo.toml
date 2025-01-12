@@ -1,0 +1,8 @@
+[package]
+name = "html-egui-bindgen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+html = "0.6"
+html-to-egui = { path = "../html-to-egui" }

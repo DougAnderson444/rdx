@@ -393,9 +393,7 @@ mod tests {
     // as above.
     #[test]
     fn test_render_element() {
-        use html::forms::Button;
-        use html::text_content::Division;
-        use html::text_content::Paragraph;
+        use html_egui_bindgen::{Button, Division, Paragraph};
 
         let html_expected = r#"<div><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><p>Click to Start counting!</p></div>"#;
 
@@ -437,7 +435,7 @@ mod tests {
 
     #[test]
     fn test_render_element_builders() {
-        use html_to_egui::{Button, Division, Paragraph};
+        use html_egui_bindgen::{Button, Division, Paragraph};
 
         let html_expected = r#"<div class="flex-row"><button id="button1" data-on-click="increment(key)">Increment</button><button id="button2" data-on-click="decrement(key, value)">Decrement</button><button id="button3" data-on-click="reset()">Reset</button><p>Click to Start counting!</p></div>"#;
 

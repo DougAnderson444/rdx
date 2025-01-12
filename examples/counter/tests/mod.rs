@@ -136,7 +136,7 @@ mod test_mod_echo {
 
         let c = bindings
             .component_plugin_run()
-            .call_increment(&mut store)
+            .call_increment_count(&mut store)
             .unwrap();
 
         assert_eq!(c, 1);
@@ -144,7 +144,7 @@ mod test_mod_echo {
 
         let c_2 = bindings
             .component_plugin_run()
-            .call_increment(&mut store)
+            .call_increment_count(&mut store)
             .unwrap();
 
         // store should have been updated too

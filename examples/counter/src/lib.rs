@@ -1,8 +1,6 @@
-#![recursion_limit = "512"]
 #[allow(warnings)]
 mod bindings;
 
-use html_to_egui::{Action, Button, DivSelectors, Division, Handler, Paragraph};
 use std::sync::{LazyLock, Mutex};
 
 use bindings::component::plugin::host::emit;
@@ -29,64 +27,8 @@ struct Counter;
 impl Guest for Counter {
     /// Say hello!
     fn load() -> String {
-        let increment_button = Button::new_with_func(
-            Action::OnClick,
-            // the function name must match the wasm function name in this file
-            // converted into kebab-case (so my_function becomes my-function)
-            Handler::builder()
-                .named("increment-count".to_string())
-                .build(),
-        )
-        .text("Increment")
-        .build();
-
-        let decrement_button = Button::new_with_func(
-            Action::OnClick,
-            Handler::builder().named("decrement".to_string()).build(),
-        )
-        .text("Decrement")
-        .build();
-
-        let no_def_count_para = Paragraph::builder()
-            .text("Click to Start counting!")
-            .build();
-
-        let def_count_para = Paragraph::builder().text("Count is: {{count}}").build();
-
-        let def_count = Division::builder()
-            .push(increment_button.clone())
-            .push(decrement_button.clone())
-            .push(def_count_para)
-            .class(DivSelectors::FlexRow)
-            .build()
-            .to_string();
-
-        let no_def_count = Division::builder()
-            .push(increment_button)
-            .push(decrement_button)
-            .push(no_def_count_para)
-            .build()
-            .to_string();
-
-        format!(
-            r#"
-            // call the system function `render` on the template with the ctx from scope
-            
-            // wasm functions are bound to the rhai script on load?
-            // let count = current(); // TODO: register all exported functions with rhai engine
-            // let count = 0;
-
-            if !is_def_var("count") || count == "0" {{
-
-                render(`{no_def_count}`)
-
-            }} else {{
-
-                render(`{def_count}`)
-
-            }}
-        "#
-        )
+        let rhai_str = include_str!(concat!(env!("OUT_DIR"), "/counter.rhai"));
+        rhai_str.to_string()
     }
 
     /// Increment the count
@@ -167,5 +109,12 @@ mod tests {
         );
 
         eprintln!("{}", test);
+    }
+
+    // print out include_str!(concat!(env!("OUT_DIR"), "/counter.rhai"))
+    #[test]
+    fn test_include_str() {
+        let rhai = include_str!(concat!(env!("OUT_DIR"), "/counter.rhai"));
+        eprintln!("{}", rhai);
     }
 }

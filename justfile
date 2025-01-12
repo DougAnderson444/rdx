@@ -2,7 +2,6 @@
 build-wits:
  for dir in crates/*; do \
     if ([ -d $dir/wit ] && [ -f $dir/src/bindings.rs ]); then \
-     cargo component build --manifest-path=$dir/Cargo.toml; \
      cargo component build --manifest-path=$dir/Cargo.toml --release; \
    fi \
  done
@@ -11,7 +10,6 @@ build-wits:
 build-examples:
   for dir in examples/*; do \
     if ([ -d $dir/wit ] && [ -f $dir/src/bindings.rs ]); then \
-     cargo component build --manifest-path=$dir/Cargo.toml --target wasm32-unknown-unknown ; \
      cargo component build --manifest-path=$dir/Cargo.toml --target wasm32-unknown-unknown --release; \
    fi \
   done
@@ -34,7 +32,7 @@ check32:
   RUSTFLAGS="--deny warnings" cargo check --target wasm32-unknown-unknown
 
 build32:
-  cargo +nightly build -Z build-std --target wasm32-unknown-unknown
+  cargo +nightly build -Z build-std --release--target wasm32-unknown-unknown
 
 force:
   cargo run --bin force-build-wasm-bins

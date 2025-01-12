@@ -30,6 +30,10 @@ async fn main() -> eframe::Result {
     )
 }
 
+#[cfg(target_arch = "wasm32")]
+#[global_allocator]
+static ALLOC: wee_alloc::WeeAlloc<'_> = wee_alloc::WeeAlloc::INIT;
+
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]
 fn main() {

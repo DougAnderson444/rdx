@@ -4,5 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-html = "0.6"
 bon = "3.3"

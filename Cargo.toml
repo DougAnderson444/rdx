@@ -1,6 +1,7 @@
 [workspace]
 members = [
   ".",
+  "crates/html-egui-bindgen",
   "crates/html-to-egui",
   "crates/validate_rhai_proc_macro",
   "examples/counter",
@@ -52,9 +53,9 @@ futures-lite = "2.5.0"
 send_wrapper = "0.6"
 parking_lot = "0.12"
 scraper = "0.22"
-html = "0.6"
 html-to-egui = { path = "crates/html-to-egui" }
 
+# For native builds:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
 rhai = { version = "1.19", features = ["sync", "serde"] }
@@ -63,6 +64,7 @@ wasmparser = "0.221"
 wasmtime_runtime_layer = "26.0.0"
 tokio = { version = "1", features = ["full"] }
 
+# For web builds:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = "0.4"
 web-sys = "0.3.70"                                                        # to access the DOM (to hide the loading text)
@@ -72,11 +74,13 @@ js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 web-time = "1.1.0"
+wee_alloc = "0.4.5"
 
 [build-dependencies]
 wasmparser = "0.221"
 
 [dev-dependencies]
+html-egui-bindgen = { path = "crates/html-egui-bindgen" }
 
 [profile.release]
 opt-level = 2 # fast and small wasm

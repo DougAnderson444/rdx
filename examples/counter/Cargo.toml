@@ -11,12 +11,16 @@ edition = "2021"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.34.0", features = ["bitflags"] }
-html-to-egui = { path = "../../crates/html-to-egui" }
 
 [dev-dependencies]
 wasmtime = { version = "25" }
 wasmtime-wasi = "25"
 thiserror = "1.0"
+
+[build-dependencies]
+html-to-egui = { path = "../../crates/html-to-egui" }
+html-egui-bindgen = { path = "../../crates/html-egui-bindgen" }
+rhai = "1.20.1"
 
 [lib]
 crate-type = ["cdylib"]

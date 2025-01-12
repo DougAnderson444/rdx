@@ -717,7 +717,7 @@ mod tests {
 
     #[test]
     fn test_instantiate_instance() {
-        const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
+        const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/release/counter.wasm");
 
         let data: State = State {
             count: 0.into(),
@@ -763,7 +763,7 @@ mod tests {
     // test Plugin struct
     #[test]
     fn test_plugin() {
-        const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/debug/counter.wasm");
+        const WASM: &[u8] = include_bytes!("../target/wasm32-unknown-unknown/release/counter.wasm");
 
         let data: State = State {
             count: 0.into(),

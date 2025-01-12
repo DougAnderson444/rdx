@@ -27,11 +27,8 @@ pub fn build_script() {
 
     let target = "wasm32-unknown-unknown";
 
-    let dir_path = if cfg!(debug_assertions) {
-        format!("target/{}/debug", target)
-    } else {
-        format!("target/{}/release", target)
-    };
+    // always use the release build, it's so much smaller and faster
+    let dir_path = format!("target/{}/release", target);
 
     let project_root = std::env::current_dir().expect("Failed to get current directory");
 
