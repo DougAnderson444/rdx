@@ -19,10 +19,6 @@ pub enum Error {
     #[error("Anyhow Error: {0}")]
     Anyhow(#[from] anyhow::Error),
 
-    /// Selector Kind error
-    #[error("Selector Kind Error: {0}")]
-    Selector(#[from] scraper::error::SelectorErrorKind<'static>),
-
     /// Parse error
     #[error("Parse Error: {0}")]
     Parse(String),

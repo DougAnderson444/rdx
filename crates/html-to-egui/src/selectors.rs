@@ -1,6 +1,7 @@
 use super::*;
 
 /// Slectors available to use with the Div element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DivSelectors {
     /// No selector.
     None,

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use crate::hteg::parse_and_render;
+use crate::hteg::HtmlToEgui;
 use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
 
 use rhai::{Dynamic, Scope};
@@ -32,6 +32,7 @@ impl RdxApp {
         for (name, wasm_bytes) in crate::BUILTIN_PLUGINS.iter() {
             // TODO: init from wasm logic somehow!
             // scope.set_or_push("count", 0);
+            tracing::info!("Loading plugin: {}", name);
 
             let mut plugin = LayerPlugin::new(wasm_bytes, State::new(ctx.clone()));
             let rdx_source = plugin.call("load", &[]).unwrap();
@@ -146,6 +147,9 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             return;
         };
 
+        let html_to_egui = Arc::new(parking_lot::Mutex::new(HtmlToEgui::default()));
+        tracing::info!("CREATED HTML TO EGUI Struct");
+
         self.engine.register_fn("render", move |html: &str| {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
             egui::Window::new(name.clone())
@@ -155,7 +159,11 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                     #[cfg(target_arch = "wasm32")]
                     let plugin_clone = plugin_clone.deref();
 
-                    if let Err(e) = parse_and_render(ui, html, plugin_clone.clone()) {
+                    if let Err(e) =
+                        html_to_egui
+                            .lock()
+                            .parse_and_render(ui, html, plugin_clone.clone())
+                    {
                         tracing::error!(
                             "Failed to parse RDX source for plugin: {}, source {} with error: {:?}",
                             name,

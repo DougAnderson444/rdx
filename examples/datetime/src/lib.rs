@@ -1,3 +1,7 @@
+#[allow(warnings)]
+#[cfg_attr(rustfmt, rustfmt_skip)]
+mod bindings;
+
 mod reactor;
 use reactor::Reactor;
 
@@ -5,9 +9,6 @@ mod block_on;
 pub use block_on::{block_on, noop_waker};
 
 mod polling;
-
-#[allow(warnings)]
-mod bindings;
 
 use bindings::component::plugin::host::{emit, now, subscribe_duration};
 use bindings::component::plugin::types::Event;
@@ -29,7 +30,6 @@ impl Guest for Component {
             render(`
                 <div>
                     <span>Seconds since unix was invented: {{datetime}}</span>
-                    <button data-on-click="ticker()">1s Refresh</button>
                 </div>
             `)
         "#
@@ -46,6 +46,7 @@ impl Guest for Component {
     }
 
     /// This function calls now() every second by
+    /// Only works in native, breaks in wasm
     fn ticker() {
         block_on(|reactor| async move {
             // we use sleep to wait for 1 second in between updates to datetime.

@@ -1,6 +1,7 @@
 use super::*;
 
 /// These are the data attibutes asscoiated with the action handlers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Attribute {
     DataOnClick,
     DataOnChange,
@@ -16,6 +17,36 @@ impl Attribute {
         match self {
             Attribute::DataOnClick => Self::DATA_ON_CLICK,
             Attribute::DataOnChange => Self::DATA_ON_CHANGE,
+        }
+    }
+}
+
+impl From<Attribute> for Action {
+    fn from(attr: Attribute) -> Self {
+        match attr {
+            Attribute::DataOnClick => Action::OnClick,
+            Attribute::DataOnChange => Action::OnChange,
+        }
+    }
+}
+
+impl From<&Attribute> for Action {
+    fn from(attr: &Attribute) -> Self {
+        match attr {
+            Attribute::DataOnClick => Action::OnClick,
+            Attribute::DataOnChange => Action::OnChange,
+        }
+    }
+}
+
+impl TryFrom<&str> for Attribute {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            Attribute::DATA_ON_CLICK => Ok(Attribute::DataOnClick),
+            Attribute::DATA_ON_CHANGE => Ok(Attribute::DataOnChange),
+            _ => Err(Error::InvalidConversion(s.to_string())),
         }
     }
 }

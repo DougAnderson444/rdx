@@ -1,3 +1,5 @@
+use std::fmt::{self, Formatter};
+
 use super::*;
 
 /// Enumerate the action handlers, such as on-click, on-change, etc.
@@ -9,9 +11,16 @@ use super::*;
 /// This enum enumerates the 'on-click', 'on-change', etc. so that
 /// the html crate can use this enum to build the html text programmatically
 /// in a type safe way, without typo errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     OnClick,
     OnChange,
+}
+
+impl Display for Action {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
 }
 
 impl Action {
@@ -24,6 +33,18 @@ impl Action {
         match self {
             Action::OnClick => Self::ON_CLICK,
             Action::OnChange => Self::ON_CHANGE,
+        }
+    }
+}
+
+impl TryFrom<&str> for Action {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            Action::ON_CLICK => Ok(Action::OnClick),
+            Action::ON_CHANGE => Ok(Action::OnChange),
+            _ => Err(Error::InvalidConversion(s.to_string())),
         }
     }
 }

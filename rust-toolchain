@@ -5,6 +5,9 @@
 # to the user in the error, instead of "error: invalid channel name '[toolchain]'".
 
 [toolchain]
-# channel = "1.82"  # Avoid specifying a patch version here; see https://github.com/emilk/eframe_template/issues/145
+# wasm-bindgen works with rust 1.78 + wasm-bindgen 2.92 onward. see: https://github.com/prisma/prisma-engines/pull/4867
+# after v1.78 there appears to be a dlmalloc issue with wasm32-unknown-unknown with [scraper] crate
+# so we are sticking with 1.78 for now
+# channel = "1.80"  # Avoid specifying a patch version here; see https://github.com/emilk/eframe_template/issues/145.
 components = [ "rustfmt", "clippy" ]
 targets = [ "wasm32-unknown-unknown" ]

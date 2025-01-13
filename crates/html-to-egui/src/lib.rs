@@ -31,3 +31,6 @@ pub use selectors::*;
 
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
+
+mod error;
+pub use error::Error;

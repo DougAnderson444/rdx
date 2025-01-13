@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 /// Holds the template parts (Static and Dynamic).
 ///
 /// Renders the template with the provided values.
@@ -14,6 +16,19 @@ pub struct Template {
 pub enum TemplatePart {
     Static(String),
     Dynamic(String),
+}
+
+// asemble the parts in sequence to return the string template literal
+impl Display for Template {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for part in &self.parts {
+            match part {
+                TemplatePart::Static(s) => write!(f, "{}", s)?,
+                TemplatePart::Dynamic(key) => write!(f, "{{{{{}}}}}", key)?,
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Template {
@@ -55,9 +70,9 @@ impl Template {
     ///
     /// Pass it an object that implements Iterator so it can perform lookups on the values given
     /// the key.
-    pub(crate) fn render<'a>(
+    pub(crate) fn render(
         &self,
-        values: impl IntoIterator<Item = (&'a str, String)> + Clone,
+        values: impl IntoIterator<Item = (String, String)> + Clone,
     ) -> String {
         let mut result = String::new();
 
@@ -68,7 +83,7 @@ impl Template {
                 TemplatePart::Dynamic(key) => {
                     if let Some(value) =
                         vals.into_iter()
-                            .find_map(|(k, v)| if k == key { Some(v) } else { None })
+                            .find_map(|(k, v)| if k == *key { Some(v) } else { None })
                     {
                         result.push_str(&value);
                     } else {
@@ -91,9 +106,9 @@ mod tests {
     #[test]
     fn test_no_replacements() {
         let template = Template::new("This is a template");
-        let values: HashMap<&str, &str> = HashMap::<&str, &str>::new();
+        let values: HashMap<String, String> = HashMap::<String, String>::new();
 
-        let result = template.render(values.iter().map(|(k, v)| (*k, v.to_string())));
+        let result = template.render(values.iter().map(|(k, v)| (k.to_string(), v.to_string())));
 
         assert_eq!(result, "This is a template");
     }
@@ -102,10 +117,10 @@ mod tests {
     fn test_template() {
         let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
         let mut values = HashMap::new();
-        values.insert("word_var", "template".to_string());
-        values.insert("a_value", "content".to_string());
+        values.insert("word_var".to_string(), "template".to_string());
+        values.insert("a_value".to_string(), "content".to_string());
 
-        let result = template.render(values.iter().map(|(k, v)| (*k, v.clone())));
+        let result = template.render(values.iter().map(|(k, v)| (k.to_string(), v.clone())));
         assert_eq!(result, "This template is replaced with content");
     }
 
@@ -118,11 +133,11 @@ mod tests {
         eprintln!("{:?}", template);
 
         let mut values = HashMap::new();
-        values.insert("word_var", "template".to_string());
-        values.insert("a_value", "content".to_string());
-        values.insert("words_here", "other words".to_string());
+        values.insert("word_var".to_string(), "template".to_string());
+        values.insert("a_value".to_string(), "content".to_string());
+        values.insert("words_here".to_string(), "other words".to_string());
 
-        let result = template.render(values.iter().map(|(k, v)| (*k, v.clone())));
+        let result = template.render(values.iter().map(|(k, v)| (k.to_string(), v.clone())));
         assert_eq!(
             result,
             "This template is replaced with content or these other words"
@@ -132,10 +147,20 @@ mod tests {
     #[test]
     fn test_missing_value() {
         let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
-        let values: HashMap<&str, &str> = HashMap::<&str, &str>::new();
+        let values: HashMap<String, String> = HashMap::<String, String>::new();
 
-        let result = template.render(values.iter().map(|(k, v)| (*k, v.to_string())));
+        let result = template.render(values.iter().map(|(k, v)| (k.to_string(), v.to_string())));
 
         assert_eq!(result, "This {{word_var}} is replaced with {{a_value}}");
+    }
+
+    // test Display
+    #[test]
+    fn test_display() {
+        let template = Template::new("This {{word_var}} is replaced with {{a_value}}");
+        assert_eq!(
+            format!("{}", template),
+            "This {{word_var}} is replaced with {{a_value}}"
+        );
     }
 }

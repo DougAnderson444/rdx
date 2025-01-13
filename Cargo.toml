@@ -3,7 +3,6 @@ members = [
   ".",
   "crates/html-egui-bindgen",
   "crates/html-to-egui",
-  "crates/validate_rhai_proc_macro",
   "examples/counter",
   "examples/datetime",
   "examples/login",
@@ -16,7 +15,7 @@ version = "0.2.1"
 authors = ["Doug Anderson <doug@peerpiper.io>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
-rust-version = "1.78"                                                # Minimum version required to build this project, for wasm-wsip1 target, 1.78 minimum is required.
+rust-version = "1.78"
 default-run = "rdx"
 
 [package.metadata.docs.rs]
@@ -52,8 +51,11 @@ anyhow = "1.0.93"
 futures-lite = "2.5.0"
 send_wrapper = "0.6"
 parking_lot = "0.12"
-scraper = { version = "0.22", default-features = false }
+html5ever = "0.27"
+markup5ever_rcdom = "0.3.0"
+markup5ever = "0.12.0"
 html-to-egui = { path = "crates/html-to-egui" }
+ahash = "0.8.11"
 
 # For native builds:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -74,13 +76,13 @@ js_wasm_runtime_layer = "0.4.0"
 anyhow = "1.0"
 send_wrapper = { version = "0.6.0", features = ["futures"] }
 web-time = "1.1.0"
-lol_alloc = "0.4.1"
 
 [build-dependencies]
 wasmparser = "0.221"
 
 [dev-dependencies]
 html-egui-bindgen = { path = "crates/html-egui-bindgen" }
+test-log = "0.2.16"
 
 [profile.release]
 opt-level = 2 # fast and small wasm

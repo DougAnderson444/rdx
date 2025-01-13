@@ -36,13 +36,13 @@ async fn main() -> eframe::Result {
 // talc was mentioned as an alternative to lol_alloc. Sadly I couldn't get talc to work with my
 // wasm32 setup.
 // See: // See: https://github.com/rustwasm/wee_alloc/issues/107#issuecomment-1820233830
-#[cfg(target_arch = "wasm32")]
-use lol_alloc::{AssumeSingleThreaded, FreeListAllocator};
-
-#[cfg(target_arch = "wasm32")]
-#[global_allocator]
-static ALLOCATOR: AssumeSingleThreaded<FreeListAllocator> =
-    unsafe { AssumeSingleThreaded::new(FreeListAllocator::new()) };
+//#[cfg(target_arch = "wasm32")]
+//use lol_alloc::{AssumeSingleThreaded, FreeListAllocator};
+//
+//#[cfg(target_arch = "wasm32")]
+//#[global_allocator]
+//static ALLOCATOR: AssumeSingleThreaded<FreeListAllocator> =
+//    unsafe { AssumeSingleThreaded::new(FreeListAllocator::new()) };
 
 // When compiling to web using trunk:
 #[cfg(target_arch = "wasm32")]

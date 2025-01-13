@@ -1,4 +1,5 @@
 #[allow(warnings)]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 mod bindings;
 
 use bindings::component::plugin::host::emit;
@@ -51,7 +52,7 @@ impl Guest for Component {
             <div id="login1">
                 <input value="{{username}}" data-on-change="username(username)">
                 <input value="{{password}}" data-on-change="password(password)">
-                <button on_click=login()>Login</button>
+                <button class="" data-on-click=login()>Login</button>
             </div>
         `)
         "#
