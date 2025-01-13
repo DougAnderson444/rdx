@@ -1,4 +1,5 @@
 #[allow(warnings)]
+#[cfg_attr(rustfmt, rustfmt_skip)]
 mod bindings;
 
 use std::sync::{LazyLock, Mutex};

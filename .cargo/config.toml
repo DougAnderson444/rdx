@@ -1,2 +1,5 @@
 [target.wasm32-unknown-unknown]
 rustflags = ["--deny", "warnings"]
+
+[env]
+RUST_LOG = "info"
