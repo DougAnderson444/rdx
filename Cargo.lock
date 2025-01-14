@@ -2110,7 +2110,7 @@ checksum = "13eca55667a5657dd1b86db77c5fe2d1810e3f9413e9555a2c4c461733dd2573"
 
 [[package]]
 name = "html-to-egui"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bon",
 ]
