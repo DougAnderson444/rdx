@@ -165,10 +165,10 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                             .parse_and_render(ui, html, plugin_clone.clone())
                     {
                         tracing::error!(
-                            "Failed to parse RDX source for plugin: {}, source {} with error: {:?}",
+                            "Failed to parse RDX source for the plugin: {}; with error: {:?}, source {}",
                             name,
+                            e,
                             html,
-                            e
                         );
                     }
                 });

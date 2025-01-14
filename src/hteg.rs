@@ -29,11 +29,8 @@ impl HtmlToEgui {
         html: &str,
         plugin: Arc<Mutex<dyn Instantiator<T>>>,
     ) -> Result<(), Error> {
-        if let Ok(html_ast) = self.parser.parse(html) {
-            render_element(ui, &html_ast, plugin.clone())?;
-        } else {
-            tracing::error!("Failed to parse html: {}", html);
-        }
+        let html_ast = self.parser.parse(html)?;
+        render_element(ui, &html_ast, plugin.clone())?;
         Ok(())
     }
 }

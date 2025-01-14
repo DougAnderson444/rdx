@@ -22,4 +22,8 @@ pub enum Error {
     /// Parse error
     #[error("Parse Error: {0}")]
     Parse(String),
+
+    /// Html parse error
+    #[error("Html Parse Error: {0}")]
+    HtmlParseError(String),
 }

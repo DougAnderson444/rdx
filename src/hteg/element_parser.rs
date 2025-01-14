@@ -47,10 +47,14 @@ pub(crate) fn parse(html: &str) -> Result<HtmlElement, Error> {
         vec![],
     )
     .from_utf8()
-    .read_from(&mut html.as_bytes())
-    .unwrap();
+    .read_from(&mut html.as_bytes())?;
 
-    let ast = HtmlElement::from_node(&dom.document).unwrap();
+    // if dom is None, that's an error
+    let Some(ast) = HtmlElement::from_node(&dom.document) else {
+        return Err(Error::HtmlParseError(
+            "Failed to parse html root node".to_string(),
+        ));
+    };
     Ok(ast)
 }
 
