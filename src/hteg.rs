@@ -63,7 +63,7 @@ fn render_element<T: Inner + Clone + Send + Sync>(
         HtmlElement::Div {
             template: _, style, ..
         } => {
-            let inner = |ui: &mut egui::Ui| {
+            let add_contents = |ui: &mut egui::Ui| {
                 if element.child_elements().is_some() {
                     for child in element.child_elements().unwrap() {
                         if let Err(e) = render_element(ui, child, plugin.clone()) {
@@ -72,14 +72,13 @@ fn render_element<T: Inner + Clone + Send + Sync>(
                     }
                 }
             };
-            match style {
-                Selectors::FlexRow => ui.horizontal(|ui| {
-                    inner(ui);
-                }),
-                Selectors::None => ui.vertical(|ui| {
-                    inner(ui);
-                }),
-            };
+
+            // Style the div as a flex row if the style has the FlexRow selector
+            if style.get(&Selectors::FlexRow).is_some() {
+                ui.horizontal(add_contents);
+            } else {
+                ui.vertical(add_contents);
+            }
         }
         HtmlElement::Button(button) => {
             let color = ui.style().visuals.widgets.active.bg_fill;

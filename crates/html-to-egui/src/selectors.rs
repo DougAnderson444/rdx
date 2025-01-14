@@ -1,24 +1,20 @@
+//! CSS selectors for the elements which translate into egui layout and styling.
 use super::*;
 
 /// Slectors available to use with the Div element.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Selectors {
-    /// No selector.
-    None,
     /// Flex row selector. Makes the div element children horizontal (side by side).
     FlexRow,
 }
 
 impl Selectors {
-    /// Default is empty string.
-    const DEFAULT: &'static str = "";
     /// Constant for the flex row selector.
     const FLEX_ROW: &'static str = "flex-row";
 
     /// Returns the string representation of the selector.
     fn as_str(&self) -> &'static str {
         match self {
-            Selectors::None => Self::DEFAULT,
             Selectors::FlexRow => Self::FLEX_ROW,
         }
     }

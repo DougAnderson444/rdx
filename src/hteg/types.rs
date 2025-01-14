@@ -2,6 +2,7 @@
 
 use std::{cell::RefCell, ops::Deref};
 
+use ahash::HashSet;
 use html_to_egui::{Action, Attribute, Selectors};
 use markup5ever_rcdom::{Handle, NodeData};
 
@@ -27,7 +28,6 @@ impl EvtHandler {
 
     /// From an [Action] value
     fn new_from(ty: Action, val: &str) -> Result<Self, Error> {
-        tracing::info!("Parsing event handler: {}", val);
         // trim end ')' ')' and split on '('
         let val = val.trim_end_matches(')');
         let mut parts = val.split('(');
@@ -82,7 +82,7 @@ pub enum HtmlElement {
         /// The text of this Div
         template: Template,
         /// The style of the div element.
-        style: Selectors,
+        style: HashSet<Selectors>,
     },
     /// Represents a button element. Buttons are converted to [egui::Button].
     Button(Button),
@@ -264,8 +264,6 @@ impl HtmlElement {
                 // Element node
                 let tag = name.local.to_string();
 
-                tracing::info!("Tag: {}", tag);
-
                 let children: Vec<HtmlElement> = node
                     .children
                     .borrow()
@@ -308,18 +306,15 @@ impl HtmlElement {
                         //    DivSelectors maps to a &str, which is available .as_str(), AsRef<str> or even
                         //    Deref)
                         // 4. If it exists, set it to the style
-                        let style = attrs
-                            .borrow()
-                            .iter()
-                            .find_map(|attr| {
-                                if *attr.name.local == *"class" {
-                                    let s: &str = &attr.value;
-                                    Selectors::try_from(s).ok()
-                                } else {
-                                    None
+                        let mut style = HashSet::default();
+                        attrs.borrow().iter().for_each(|attr| {
+                            if *attr.name.local == *"class" {
+                                let s: &str = &attr.value;
+                                if let Ok(selector) = Selectors::try_from(s) {
+                                    style.insert(selector);
                                 }
-                            })
-                            .unwrap_or(Selectors::None);
+                            }
+                        });
 
                         Some(HtmlElement::Div {
                             children,
@@ -384,9 +379,7 @@ impl HtmlElement {
                         Some(HtmlElement::Span { template: text })
                     }
                     Self::PARAGRAPH => {
-                        tracing::info!("Paragraph: {}", text);
                         let text = Template::new(&text);
-                        tracing::info!("Paragraph template: {:?}", text);
                         Some(HtmlElement::Paragraph { template: text })
                     }
                     _ => None,
@@ -476,7 +469,6 @@ impl Deref for HtmlElement {
 
 // parse event handlers
 fn parse_evt_handlers(attrs: &RefCell<Vec<markup5ever::interface::Attribute>>) -> Vec<EvtHandler> {
-    tracing::info!("Parsing event handlers: {:?}", attrs);
     let mut evt_handlers = Vec::new();
     for attr in attrs.borrow().iter() {
         if let Ok(attribute) = Attribute::try_from(attr.name.local.to_string().as_str()) {
