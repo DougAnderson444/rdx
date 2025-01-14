@@ -20,7 +20,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use html_egui_bindgen::{Button, Division, Paragraph};
-use html_to_egui::{Action, DivSelectors, Handler};
+use html_to_egui::{Action, Handler, Selectors};
 use rhai::Engine;
 use rhai::ParseError;
 
@@ -83,7 +83,7 @@ fn gen_script() -> String {
         .push(increment_button.clone())
         .push(decrement_button.clone())
         .push(def_count_para)
-        .class(DivSelectors::FlexRow)
+        .class(Selectors::FlexRow)
         .build()
         .to_string();
 

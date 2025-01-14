@@ -3,7 +3,7 @@ mod element_parser;
 mod types;
 
 use element_parser::Parser;
-use html_to_egui::{Action, DivSelectors};
+use html_to_egui::{Action, Selectors};
 use types::{FuncAndArgs, HtmlElement};
 
 use std::sync::{Arc, Mutex};
@@ -73,10 +73,10 @@ fn render_element<T: Inner + Clone + Send + Sync>(
                 }
             };
             match style {
-                DivSelectors::FlexRow => ui.horizontal(|ui| {
+                Selectors::FlexRow => ui.horizontal(|ui| {
                     inner(ui);
                 }),
-                DivSelectors::None => ui.vertical(|ui| {
+                Selectors::None => ui.vertical(|ui| {
                     inner(ui);
                 }),
             };

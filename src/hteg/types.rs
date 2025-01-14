@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, ops::Deref};
 
-use html_to_egui::{Action, Attribute, DivSelectors};
+use html_to_egui::{Action, Attribute, Selectors};
 use markup5ever_rcdom::{Handle, NodeData};
 
 use crate::{
@@ -82,7 +82,7 @@ pub enum HtmlElement {
         /// The text of this Div
         template: Template,
         /// The style of the div element.
-        style: DivSelectors,
+        style: Selectors,
     },
     /// Represents a button element. Buttons are converted to [egui::Button].
     Button(Button),
@@ -299,10 +299,32 @@ impl HtmlElement {
                             })
                             .collect::<Vec<_>>()
                             .join(" ");
+
+                        // what we really want to do in order to make this
+                        // matching type safe and extensible, is:
+                        // 1. Get the class attribute
+                        // 2. Split the value on whitespace to get each class name
+                        // 3. Match each class name to a DivSelectors variant, if it exists (each
+                        //    DivSelectors maps to a &str, which is available .as_str(), AsRef<str> or even
+                        //    Deref)
+                        // 4. If it exists, set it to the style
+                        let style = attrs
+                            .borrow()
+                            .iter()
+                            .find_map(|attr| {
+                                if *attr.name.local == *"class" {
+                                    let s: &str = &attr.value;
+                                    Selectors::try_from(s).ok()
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(Selectors::None);
+
                         Some(HtmlElement::Div {
                             children,
                             template: Template::new(&text),
-                            style: DivSelectors::None,
+                            style,
                         })
                     }
                     Self::BUTTON => {
