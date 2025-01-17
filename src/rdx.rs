@@ -375,12 +375,12 @@ mod tests {
 
         //// Execute script
         if let Err(e) = engine.run_ast_with_scope(&mut scope, &ast) {
-            error!("Failed to execute script: {:?}", e);
+            tracing::error!("Failed to execute script: {:?}", e);
         }
 
         // Call the tick function
         if let Err(e) = engine.call_fn::<()>(&mut scope, &ast, "tick", ()) {
-            error!("Failed to call tick function: {:?}", e);
+            tracing::error!("Failed to call tick function: {:?}", e);
         }
     }
 }
