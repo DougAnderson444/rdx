@@ -2,6 +2,9 @@ use egui::ScrollArea;
 
 use crate::RdxApp;
 
+/// Our app key
+const APP_KEY: &str = "rdx_app";
+
 /// Left Panel State
 #[derive(serde::Deserialize, serde::Serialize)]
 struct LeftPanelState {
@@ -53,7 +56,7 @@ impl TemplateApp {
         // Note that you must enable the `persistence` feature for this to work.
         if let Some(storage) = cc.storage {
             tracing::debug!("Loading previous app state");
-            return eframe::get_value(storage, eframe::APP_KEY).unwrap_or_default();
+            return eframe::get_value(storage, APP_KEY).unwrap_or_default();
         }
 
         Self {
@@ -66,7 +69,7 @@ impl TemplateApp {
 impl eframe::App for TemplateApp {
     /// Called by the frame work to save state before shutdown.
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        eframe::set_value(storage, eframe::APP_KEY, self);
+        eframe::set_value(storage, APP_KEY, self);
     }
 
     /// Called each time the UI needs repainting, which may be many times per second.
