@@ -82,6 +82,7 @@ impl Deref for ScopeRef {
     }
 }
 
+#[derive(Debug)]
 pub enum ScopeRefMut<'a> {
     Borrowed(MutexGuard<'a, RawMutex, rhai::Scope<'static>>),
     Refcell(RefMut<'a, rhai::Scope<'static>>),
