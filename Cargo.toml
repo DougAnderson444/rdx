@@ -7,6 +7,7 @@ members = [
   "examples/datetime",
   "examples/login",
   "examples/random",
+  "examples/todo",
 ]
 
 [package]

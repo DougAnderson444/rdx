@@ -1,0 +1,24 @@
+[package]
+name = "todo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wit-bindgen-rt = { version = "0.37.0", features = ["bitflags"] }
+
+[build-dependencies]
+html-to-egui = { path = "../../crates/html-to-egui" }
+html-egui-bindgen = { path = "../../crates/html-egui-bindgen" }
+rhai = "1.20.1"
+
+[lib]
+crate-type = ["cdylib"]
+
+# [[bin]]
+# name = "force-build-wasm-bins"
+# path = "build.rs"
+
+[package.metadata.component]
+package = "component:todo"
+
+[package.metadata.component.dependencies]
