@@ -122,6 +122,8 @@ impl_hteg! { Paragraph, html::text_content::Paragraph, html::text_content::build
 impl_hteg! { Label, html::forms::Label, html::forms::builders::LabelBuilder}
 // html::forms::Input
 impl_hteg! { Input, html::forms::Input, html::forms::builders::InputBuilder}
+// html::inline_text::Span
+impl_hteg! { Span, html::inline_text::Span, html::inline_text::builders::SpanBuilder}
 
 // Divisions with text
 impl_hteg_text! { Division, html::text_content::Division, html::text_content::builders::DivisionBuilder}
