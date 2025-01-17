@@ -95,7 +95,7 @@ impl HtmlToEgui {
                 if style.get(&Selectors::FlexRow).is_some() {
                     ui.horizontal(add_contents);
                 } else {
-                    tracing::info!("Adding vertical div");
+                    ui.vertical(add_contents);
                 }
             }
             HtmlElement::Button(button) => {
