@@ -1,20 +1,19 @@
 #![allow(clippy::arc_with_non_send_sync)]
 
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::ops::Deref as _;
+use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::hteg::HtmlToEgui;
 use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
 
 use rhai::{Dynamic, Scope};
-use tracing::error;
 use wasm_component_layer::Value;
 
 #[cfg(target_arch = "wasm32")]
 use send_wrapper::SendWrapper;
-
-#[cfg(target_arch = "wasm32")]
-use std::ops::Deref as _;
 
 pub struct RdxApp {
     pub(crate) plugins: HashMap<String, PluginDeets<State>>,
@@ -26,6 +25,48 @@ impl Default for RdxApp {
     }
 }
 
+// a closure that enables us to register a function by name with zero arguments
+fn register(deets: &mut PluginDeets<State>, fn_name: String, arguments: Vec<Value>) {
+    let plugin_clone = deets.plugin.clone();
+    deets
+        .engine
+        .borrow_mut()
+        .register_fn(fn_name.clone(), move || {
+            let res = {
+                let mut lock = plugin_clone.lock();
+                lock.call(&fn_name, &arguments).unwrap()
+            };
+
+            // a recurive function that converts List type into Dynamic type
+            fn value_to_dynamic(v: Value) -> Dynamic {
+                match v {
+                    Value::Bool(b) => Dynamic::from(b),
+                    Value::Option(ov) => match ov.deref().clone() {
+                        Some(v) => value_to_dynamic(v),
+                        None => false.into(),
+                    },
+                    Value::String(s) => Dynamic::from(s.to_string()),
+                    Value::U8(u) => Dynamic::from(u),
+                    Value::List(list) => {
+                        let list = list.into_iter().map(value_to_dynamic).collect::<Vec<_>>();
+                        Dynamic::from(list)
+                    }
+                    Value::Tuple(t) => {
+                        let t = t.into_iter().map(value_to_dynamic).collect::<Vec<_>>();
+                        Dynamic::from(t)
+                    }
+                    Value::F32(f) => Dynamic::from(f),
+                    Value::F64(f) => Dynamic::from(f),
+                    Value::U32(u) => Dynamic::from(u),
+                    Value::U64(u) => Dynamic::from(u),
+                    _ => false.into(),
+                }
+            }
+
+            // convert the returned result into Dynamic type
+            res.map(value_to_dynamic).unwrap_or(false.into())
+        });
+}
 impl RdxApp {
     pub fn new(ctx: Option<egui::Context>) -> Self {
         let mut plugins = HashMap::new();
@@ -40,12 +81,30 @@ impl RdxApp {
                 panic!("RDX Source should be a string");
             };
 
-            let plugin_mod = Arc::new(Mutex::new(plugin));
+            let arc_plugin = Arc::new(parking_lot::Mutex::new(plugin));
+            let mut plugin_deets =
+                PluginDeets::new(name.to_string(), arc_plugin.clone(), rdx_source.to_string());
 
-            plugins.insert(
-                name.to_string(),
-                PluginDeets::new(name.to_string(), plugin_mod, rdx_source.to_string()),
-            );
+            // call("register", &[])
+            match arc_plugin.lock().call("register", &[]) {
+                Ok(Some(Value::List(list))) => {
+                    for fn_name in &list {
+                        if let Value::String(fn_name) = fn_name {
+                            tracing::info!(
+                                "Registering function: {:?} from plugin: {:?}",
+                                fn_name,
+                                name
+                            );
+                            register(&mut plugin_deets, fn_name.to_string(), vec![]);
+                        }
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!("Failed to call register on plugin: {:?}", e);
+                }
+            }
+            plugins.insert(name.to_string(), plugin_deets);
         }
 
         Self { plugins }
@@ -100,9 +159,9 @@ pub struct PluginDeets<T: Inner + Send> {
     /// The name of the plugin
     name: String,
     /// Reference counted impl [Instantiator] so we can pass it into the rhai engine closure
-    pub plugin: Arc<Mutex<dyn Instantiator<T>>>,
+    pub plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
     /// The rhai engine
-    pub engine: rhai::Engine,
+    pub engine: Rc<RefCell<rhai::Engine>>,
     /// The AST of the RDX source
     ast: Option<rhai::AST>,
     /// The egui context, so we can `.show()` an [egui::Window]
@@ -111,7 +170,11 @@ pub struct PluginDeets<T: Inner + Send> {
 
 impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
     /// pass any plugin that impls Instantiator
-    pub fn new(name: String, plugin: Arc<Mutex<dyn Instantiator<T>>>, rdx_source: String) -> Self {
+    pub fn new(
+        name: String,
+        plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
+        rdx_source: String,
+    ) -> Self {
         let mut engine = rhai::Engine::new();
 
         engine.set_max_map_size(500); // allow object maps with only up to 500 properties
@@ -128,7 +191,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
         Self {
             name,
             plugin,
-            engine,
+            engine: Rc::new(RefCell::new(engine)),
             ast,
             ctx: None,
         }
@@ -147,13 +210,17 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             return;
         };
 
-        let html_to_egui = Arc::new(parking_lot::Mutex::new(HtmlToEgui::default()));
+        let html_to_egui = Arc::new(parking_lot::Mutex::new(send_wrapper::SendWrapper::new(
+            HtmlToEgui::new(self.engine.clone(), self.ast.clone().unwrap()),
+        )));
+
         tracing::info!("CREATED HTML TO EGUI Struct");
 
-        self.engine.register_fn("render", move |html: &str| {
+        self.engine.borrow_mut().register_fn("render", move |html: &str| {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
             egui::Window::new(name.clone())
                 .resizable(true)
+                .max_width(ctx.available_rect().width())
                 .show(&ctx, |ui| {
                     // [browser]: unwrap the sendwrapper to get the plugin
                     #[cfg(target_arch = "wasm32")]
@@ -223,26 +290,46 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
         if let Some(ast) = &self.ast {
             // Get the scope from the plugin and clone it
             let mut scope = {
-                let Ok(plugin) = self.plugin.lock() else {
-                    tracing::error!("Failed to lock plugin");
-                    return;
-                };
-
+                let plugin = self.plugin.lock();
+                // TODO: scope is just a copy, because otherwise the app locks up...
                 plugin.store().data().clone().into_scope()
             };
 
-            // Execute script.
-            // Since the script returns `render(some_rdx_code)`, it will in turn
-            // call register_fn("render") and render the UI.
-            if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
-                error!("Failed to execute script: {:?}", e);
-                // check if e matches  rhai::EvalAltResult::ErrorFunctionNotFound
-                // if so, call register_fn() and try again
-                if let rhai::EvalAltResult::ErrorFunctionNotFound(_, _) = e.as_ref() {
-                    //self.register_fn();
-                    //if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
-                    //    error!("Failed to execute script: {:?}", e);
+            // We have to run the script with only a copy of the scope,
+            // because inside that script we use locks on the plugin to change its state.
+            // There's no real way around this. We can't lock the plugin and the scope at the same time.
+            // So what we end up doing is passing a copy of the scope into the script, and then
+            // afterward what we should do is check to see if the scope has changed, and if it has,
+            // re-write it back to the original scope.
+            // It's a hacky workaround, but it works.
+            match self.engine.borrow().run_ast_with_scope(&mut scope, ast) {
+                Ok(_) => {
+                    // compare the scope with the original scope, update the original scope if it has changed
+                    //let mut plugin = self.plugin.lock();
+                    //let mut plugin_scope = plugin.store_mut().data_mut().scope_mut();
+                    // Scope doesn impl Eq or PartialEq, so we have to compare the string representation
+                    // if plugin name is peer_book.wasm, then show:
+                    //if self.name == "peer_book.wasm" {
+                    //    tracing::info!("Peer book scope: {:?}", scope);
                     //}
+                    //if plugin_scope.to_string() != scope.to_string() {
+                    //    tracing::info!(
+                    //        "Scope has changed, updating the original scope to {:?}",
+                    //        scope
+                    //    );
+                    //    *plugin_scope = scope;
+                    //}
+                }
+                Err(e) => {
+                    tracing::error!("Failed to execute script: {:?}", e);
+                    // check if e matches  rhai::EvalAltResult::ErrorFunctionNotFound
+                    // if so, call register_fn() and try again
+                    if let rhai::EvalAltResult::ErrorFunctionNotFound(_, _) = e.as_ref() {
+                        //self.register_fn();
+                        //if let Err(e) = self.engine.run_ast_with_scope(&mut scope, ast) {
+                        //    error!("Failed to execute script: {:?}", e);
+                        //}
+                    }
                 }
             }
             //match self.engine.call_fn::<()>(&mut scope, ast, "tick", ()) {
