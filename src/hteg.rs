@@ -9,7 +9,7 @@ use types::{FuncAndArgs, HtmlElement};
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use wasm_component_layer::Value;
 
@@ -44,7 +44,7 @@ impl HtmlToEgui {
         &mut self,
         ui: &mut egui::Ui,
         html: &str,
-        plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
+        plugin: Arc<Mutex<dyn Instantiator<T>>>,
     ) -> Result<(), Error> {
         let html_ast = self.parser.parse(html)?;
         self.render_element(ui, &html_ast, plugin.clone())?;
@@ -57,12 +57,12 @@ impl HtmlToEgui {
         &mut self,
         ui: &mut egui::Ui,
         element: &HtmlElement,
-        plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
+        plugin: Arc<Mutex<dyn Instantiator<T>>>,
     ) -> Result<(), Error> {
         // get the content scope values
         // converts the rhai::Dynamic value to a string
         let entries = {
-            let lock = plugin.lock();
+            let lock = plugin.lock().unwrap();
             let state = lock.store().data();
             let scope = state.clone().into_scope();
             scope
@@ -113,7 +113,7 @@ impl HtmlToEgui {
                     }) = button.func_and_args(Action::OnClick)
                     {
                         let arguments = {
-                            let mut lock = plugin.lock();
+                            let mut lock = plugin.lock().unwrap();
                             let scope = lock.store_mut().data_mut().scope_mut();
                             args.iter()
                                 // ONLY use non-empty args, filter everything else out
@@ -134,7 +134,7 @@ impl HtmlToEgui {
                             arguments.len()
                         );
 
-                        let mut lock = plugin.lock();
+                        let mut lock = plugin.lock().unwrap();
                         match lock.call(&on_click, arguments.as_slice()) {
                             Ok(res) => {
                                 tracing::info!("on_click response {:?}", res);
@@ -207,7 +207,7 @@ impl HtmlToEgui {
                 // Get the value of the variable from the rhai::Scope
                 // Put the value into rhai::Scope as the value of the variable
                 // Can I just linkt he rhai scope variable to the TextEdit widget?
-                let mut lock = plugin.lock();
+                let mut lock = plugin.lock().unwrap();
                 let mut scope = lock.store_mut().data_mut().scope_mut();
 
                 if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
@@ -239,7 +239,7 @@ impl HtmlToEgui {
                                 drop(scope);
                                 drop(lock);
 
-                                let mut lock = plugin.lock();
+                                let mut lock = plugin.lock().unwrap();
 
                                 if let Ok(value) = lock.call(&on_change, args.as_slice()) {
                                     match value {

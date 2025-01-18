@@ -3429,7 +3429,6 @@ dependencies = [
  "log",
  "markup5ever",
  "markup5ever_rcdom",
- "parking_lot",
  "rand",
  "rhai",
  "send_wrapper",

@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref as _;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::hteg::HtmlToEgui;
 use crate::layer::{Inner, Instantiator, LayerPlugin, ScopeRef, ScopeRefMut};
@@ -33,7 +33,7 @@ fn register(deets: &mut PluginDeets<State>, fn_name: String, arguments: Vec<Valu
         .borrow_mut()
         .register_fn(fn_name.clone(), move || {
             let res = {
-                let mut lock = plugin_clone.lock();
+                let mut lock = plugin_clone.lock().unwrap();
                 lock.call(&fn_name, &arguments).unwrap()
             };
 
@@ -81,12 +81,12 @@ impl RdxApp {
                 panic!("RDX Source should be a string");
             };
 
-            let arc_plugin = Arc::new(parking_lot::Mutex::new(plugin));
+            let arc_plugin = Arc::new(Mutex::new(plugin));
             let mut plugin_deets =
                 PluginDeets::new(name.to_string(), arc_plugin.clone(), rdx_source.to_string());
 
             // call("register", &[])
-            match arc_plugin.lock().call("register", &[]) {
+            match arc_plugin.lock().unwrap().call("register", &[]) {
                 Ok(Some(Value::List(list))) => {
                     for fn_name in &list {
                         if let Value::String(fn_name) = fn_name {
@@ -113,14 +113,14 @@ impl RdxApp {
 
 #[derive(Debug, Clone)]
 pub struct State {
-    scope: Arc<parking_lot::Mutex<Scope<'static>>>,
+    scope: Arc<Mutex<Scope<'static>>>,
     egui_ctx: Option<egui::Context>,
 }
 
 impl State {
     pub fn new(ctx: Option<egui::Context>) -> Self {
         Self {
-            scope: Arc::new(parking_lot::Mutex::new(Scope::new())),
+            scope: Arc::new(Mutex::new(Scope::new())),
             egui_ctx: ctx,
         }
     }
@@ -133,7 +133,7 @@ impl Inner for State {
 
     /// Updates the scope variable to the given value
     fn update(&mut self, key: &str, value: impl Into<Dynamic> + Clone) {
-        self.scope.lock().set_or_push(key, value.into());
+        self.scope.lock().unwrap().set_or_push(key, value.into());
         if let Some(egui_ctx) = &self.egui_ctx {
             tracing::info!("Requesting repaint");
             egui_ctx.request_repaint();
@@ -148,12 +148,12 @@ impl Inner for State {
     }
 
     fn scope_mut(&mut self) -> ScopeRefMut {
-        ScopeRefMut::Borrowed(self.scope.lock())
+        ScopeRefMut::Borrowed(self.scope.lock().unwrap())
     }
 
     // into_scope with 'static lifetime'
     fn into_scope(self) -> rhai::Scope<'static> {
-        self.scope.lock().clone()
+        self.scope.lock().unwrap().clone()
     }
 }
 
@@ -163,7 +163,7 @@ pub struct PluginDeets<T: Inner + Send> {
     /// The name of the plugin
     name: String,
     /// Reference counted impl [Instantiator] so we can pass it into the rhai engine closure
-    pub plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
+    pub plugin: Arc<Mutex<dyn Instantiator<T>>>,
     /// The rhai engine
     pub engine: Rc<RefCell<rhai::Engine>>,
     /// The AST of the RDX source
@@ -174,11 +174,7 @@ pub struct PluginDeets<T: Inner + Send> {
 
 impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
     /// pass any plugin that impls Instantiator
-    pub fn new(
-        name: String,
-        plugin: Arc<parking_lot::Mutex<dyn Instantiator<T>>>,
-        rdx_source: String,
-    ) -> Self {
+    pub fn new(name: String, plugin: Arc<Mutex<dyn Instantiator<T>>>, rdx_source: String) -> Self {
         let mut engine = rhai::Engine::new();
 
         engine.set_max_map_size(500); // allow object maps with only up to 500 properties
@@ -214,9 +210,10 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             return;
         };
 
-        let html_to_egui = Arc::new(parking_lot::Mutex::new(send_wrapper::SendWrapper::new(
-            HtmlToEgui::new(self.engine.clone(), self.ast.clone().unwrap()),
-        )));
+        let html_to_egui = Arc::new(Mutex::new(send_wrapper::SendWrapper::new(HtmlToEgui::new(
+            self.engine.clone(),
+            self.ast.clone().unwrap(),
+        ))));
 
         tracing::info!("CREATED HTML TO EGUI Struct");
 
@@ -233,6 +230,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                     if let Err(e) =
                         html_to_egui
                             .lock()
+                            .unwrap()
                             .parse_and_render(ui, html, plugin_clone.clone())
                     {
                         tracing::error!(
@@ -294,7 +292,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
         if let Some(ast) = &self.ast {
             // Get the scope from the plugin and clone it
             let mut scope = {
-                let plugin = self.plugin.lock();
+                let plugin = self.plugin.lock().unwrap();
                 // TODO: scope is just a copy, because otherwise the app locks up...
                 plugin.store().data().clone().into_scope()
             };

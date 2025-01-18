@@ -20,6 +20,7 @@ use std::pin::Pin;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::MutexGuard;
 use std::sync::{Arc, Mutex};
 #[cfg(not(target_arch = "wasm32"))]
 pub use std::time::{Duration, Instant, SystemTime};
@@ -46,17 +47,16 @@ pub use wasmtime_runtime_layer as runtime_layer;
 pub use js_wasm_runtime_layer as runtime_layer;
 
 pub use crate::Error;
-use parking_lot::{lock_api::MutexGuard, RawMutex};
 
 /// Immutable reference to the [rhai::Scope]
 pub enum ScopeRef {
-    Borrowed(Arc<parking_lot::Mutex<rhai::Scope<'static>>>),
+    Borrowed(Arc<Mutex<rhai::Scope<'static>>>),
     Refcell(Rc<RefCell<rhai::Scope<'static>>>),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 impl Deref for ScopeRef {
-    type Target = Arc<parking_lot::Mutex<rhai::Scope<'static>>>;
+    type Target = Arc<Mutex<rhai::Scope<'static>>>;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -84,7 +84,7 @@ impl Deref for ScopeRef {
 
 #[derive(Debug)]
 pub enum ScopeRefMut<'a> {
-    Borrowed(MutexGuard<'a, RawMutex, rhai::Scope<'static>>),
+    Borrowed(MutexGuard<'a, rhai::Scope<'static>>),
     Refcell(RefMut<'a, rhai::Scope<'static>>),
 }
 
@@ -693,7 +693,7 @@ mod tests {
     #[derive(Default)]
     struct State {
         count: rhai::Dynamic,
-        scope: Arc<parking_lot::Mutex<rhai::Scope<'static>>>,
+        scope: Arc<Mutex<rhai::Scope<'static>>>,
     }
 
     impl Inner for State {
@@ -715,11 +715,11 @@ mod tests {
         }
 
         fn scope_mut(&mut self) -> ScopeRefMut {
-            ScopeRefMut::Borrowed(self.scope.lock())
+            ScopeRefMut::Borrowed(self.scope.lock().unwrap())
         }
 
         fn into_scope(self) -> rhai::Scope<'static> {
-            self.scope.lock().clone()
+            self.scope.lock().unwrap().clone()
         }
     }
 
