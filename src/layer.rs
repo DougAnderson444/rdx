@@ -108,6 +108,9 @@ impl DerefMut for ScopeRefMut<'_> {
     }
 }
 pub trait Inner {
+    /// Trigger a save event on the host
+    fn save(&self);
+
     /// Update the state with the given key and value
     fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Clone);
 
@@ -694,6 +697,10 @@ mod tests {
     }
 
     impl Inner for State {
+        fn save(&self) {
+            println!("saving state");
+        }
+
         fn update(&mut self, key: &str, value: impl Into<rhai::Dynamic> + Clone) {
             println!("updating {}: {}", key, value.clone().into());
             // set count to value

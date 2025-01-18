@@ -127,6 +127,10 @@ impl State {
 }
 
 impl Inner for State {
+    fn save(&self) {
+        // Save state to disk if you like
+    }
+
     /// Updates the scope variable to the given value
     fn update(&mut self, key: &str, value: impl Into<Dynamic> + Clone) {
         self.scope.lock().set_or_push(key, value.into());
