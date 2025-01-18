@@ -187,9 +187,6 @@ impl HtmlToEgui {
                                 tracing::trace!("Error calling on_click rhai function: {:?}", e);
                             }
                         }
-
-                        // print scope
-                        //tracing::info!("Scope after on_click call_fn: {:?}", scope);
                     }
                 }
                 ui.add_space(4.0);
