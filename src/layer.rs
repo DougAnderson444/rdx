@@ -656,7 +656,7 @@ impl<T: Inner + Send + Sync + 'static> Instantiator<T> for LayerPlugin<T> {
 
     /// Calls the given function name with the given parameters
     fn call(&mut self, name: &str, arguments: &[Value]) -> Result<Option<Value>, Error> {
-        tracing::info!("Calling function: {}", name);
+        tracing::trace!("Calling function: {}", name);
         let export_instance = self
             .raw_instance
             .exports()
