@@ -77,12 +77,14 @@ pub enum HtmlElement {
     },
     /// Represents a div element. Divs are converted to [egui::Ui::vertical] by default.
     Div {
+        /// The identlifier of the div element.
+        id: Option<String>,
         /// The [HtmlElement] children of the div element.
         children: Vec<HtmlElement>,
         /// The text of this Div
         template: Template,
         /// The style of the div element.
-        style: HashSet<Selectors>,
+        classes: HashSet<Selectors>,
     },
     /// Represents a button element. Buttons are converted to [egui::Button].
     Button(Button),
@@ -107,6 +109,10 @@ pub enum HtmlElement {
     Text {
         /// The text content of the element.
         contents: Template,
+    },
+    TextArea {
+        /// The text content of the element.
+        placeholder: Template,
     },
 }
 
@@ -231,6 +237,7 @@ impl HtmlElement {
     const LABEL: &'static str = "label";
     const SPAN: &'static str = "span";
     const PARAGRAPH: &'static str = "p";
+    const TEXTAREA: &'static str = "textarea";
 
     // Method to get the string representation
     pub(crate) fn as_str(&self) -> &'static str {
@@ -242,6 +249,7 @@ impl HtmlElement {
             HtmlElement::Label { .. } => Self::LABEL,
             HtmlElement::Span { .. } => Self::SPAN,
             HtmlElement::Paragraph { .. } => Self::PARAGRAPH,
+            HtmlElement::TextArea { .. } => Self::TEXTAREA,
             // No need
             HtmlElement::Text { .. } => unreachable!(),
         }
@@ -263,6 +271,11 @@ impl HtmlElement {
             NodeData::Element { name, attrs, .. } => {
                 // Element node
                 let tag = name.local.to_string();
+                let id = attrs
+                    .borrow()
+                    .iter()
+                    .find(|attr| *attr.name.local == *"id")
+                    .map(|attr| attr.value.to_string());
 
                 let children: Vec<HtmlElement> = node
                     .children
@@ -306,20 +319,21 @@ impl HtmlElement {
                         //    DivSelectors maps to a &str, which is available .as_str(), AsRef<str> or even
                         //    Deref)
                         // 4. If it exists, set it to the style
-                        let mut style = HashSet::default();
+                        let mut classes = HashSet::default();
                         attrs.borrow().iter().for_each(|attr| {
                             if *attr.name.local == *"class" {
                                 let s: &str = &attr.value;
                                 if let Ok(selector) = Selectors::try_from(s) {
-                                    style.insert(selector);
+                                    classes.insert(selector);
                                 }
                             }
                         });
 
                         Some(HtmlElement::Div {
+                            id,
                             children,
                             template: Template::new(&text),
-                            style,
+                            classes,
                         })
                     }
                     Self::BUTTON => {
@@ -382,6 +396,17 @@ impl HtmlElement {
                         let text = Template::new(&text);
                         Some(HtmlElement::Paragraph { template: text })
                     }
+                    Self::TEXTAREA => {
+                        let placeholder = attrs
+                            .borrow()
+                            .iter()
+                            .find(|attr| *attr.name.local == *"placeholder")
+                            .map(|attr| attr.value.to_string())
+                            .unwrap_or_default();
+                        Some(HtmlElement::TextArea {
+                            placeholder: Template::new(&placeholder),
+                        })
+                    }
                     _ => None,
                 }
             }
@@ -428,6 +453,7 @@ impl HtmlElement {
             HtmlElement::Button(Button { template, .. }) => template,
             HtmlElement::Input(Input { value, .. }) => value,
             HtmlElement::Text { contents } => contents,
+            HtmlElement::TextArea { placeholder } => placeholder,
         }
     }
 }

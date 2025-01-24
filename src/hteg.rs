@@ -42,12 +42,13 @@ impl HtmlToEgui {
     /// Then renders the elements into egui UI components.
     pub fn parse_and_render<T: Inner + Clone + Send + Sync>(
         &mut self,
+        ctx: egui::Context,
         ui: &mut egui::Ui,
         html: &str,
         plugin: Arc<Mutex<dyn Instantiator<T>>>,
     ) -> Result<(), Error> {
         let html_ast = self.parser.parse(html)?;
-        self.render_element(ui, &html_ast, plugin.clone())?;
+        self.render_element(ctx, ui, &html_ast, plugin.clone())?;
         Ok(())
     }
 
@@ -55,6 +56,7 @@ impl HtmlToEgui {
     /// HTML into egui UI components.
     fn render_element<T: Inner + Clone + Send + Sync>(
         &mut self,
+        ctx: egui::Context,
         ui: &mut egui::Ui,
         element: &HtmlElement,
         plugin: Arc<Mutex<dyn Instantiator<T>>>,
@@ -74,16 +76,20 @@ impl HtmlToEgui {
         match element {
             HtmlElement::Html { children, .. } => {
                 for child in children {
-                    self.render_element(ui, child, plugin.clone())?;
+                    self.render_element(ctx.clone(), ui, child, plugin.clone())?;
                 }
             }
             HtmlElement::Div {
-                template: _, style, ..
+                template: _,
+                classes,
+                ..
             } => {
                 let add_contents = |ui: &mut egui::Ui| {
                     if element.child_elements().is_some() {
                         for child in element.child_elements().unwrap() {
-                            if let Err(e) = self.render_element(ui, child, plugin.clone()) {
+                            if let Err(e) =
+                                self.render_element(ctx.clone(), ui, child, plugin.clone())
+                            {
                                 tracing::error!("Error rendering child element: {:?}", e);
                             }
                         }
@@ -260,6 +266,43 @@ impl HtmlToEgui {
                     }
                 } else {
                     scope.set_value(var_name.as_str(), var_name.to_string());
+                }
+            }
+            // TextArea is similar to Input, but it's multiline
+            // Another difference is the templace variable is extracted from placeholder, not value
+            // attribute (there isn't a value attribute for textarea)
+            HtmlElement::TextArea { placeholder } => {
+                let Some(TemplatePart::Dynamic(var_name)) = placeholder.parts.first() else {
+                    tracing::error!("No variable name found in placeholder");
+                    // nowhere to save the input, returning early
+                    return Err(Error::Parse("No variable name found".to_string()));
+                };
+
+                // Get the value of the variable from the rhai::Scope
+                // Put the value into rhai::Scope as the value of the variable
+                // Can I just linkt he rhai scope variable to the TextEdit widget?
+                let mut lock = plugin.lock().unwrap();
+                let mut scope = lock.store_mut().data_mut().scope_mut();
+
+                // 1. get scope.get_value::<String>(var_name.as_str())
+                // 2. if it doesn't exist, set it to var_name.to_string() and set_value
+                // 3. use the value to create a TextEdit widget
+                // 4. if the widget changes, update the scope variable
+                let mut val = scope
+                    .get_value::<String>(var_name.as_str())
+                    .unwrap_or_else(|| {
+                        let val = var_name.to_string();
+                        scope.set_value(var_name.as_str(), val.clone());
+                        val
+                    });
+
+                let response = ui.add_sized(
+                    ui.available_size(),
+                    egui::TextEdit::multiline(&mut val).desired_rows(5),
+                );
+
+                if response.changed() {
+                    scope.set_value(var_name.as_str(), val.clone());
                 }
             }
             HtmlElement::Label { template }

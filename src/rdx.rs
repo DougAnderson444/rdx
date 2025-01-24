@@ -231,7 +231,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
                         html_to_egui
                             .lock()
                             .unwrap()
-                            .parse_and_render(ui, html, plugin_clone.clone())
+                            .parse_and_render(ctx.clone(), ui, html, plugin_clone.clone())
                     {
                         tracing::error!(
                             "Failed to parse RDX source for the plugin: {}; with error: {:?}, source {}",
