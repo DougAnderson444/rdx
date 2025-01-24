@@ -92,8 +92,8 @@ impl HtmlToEgui {
 
                 ui.set_max_width(ui.available_width());
                 // Style the div as a flex row if the style has the FlexRow selector
-                if style.get(&Selectors::FlexRow).is_some() {
-                    ui.horizontal(add_contents);
+                if classes.get(&Selectors::FlexRow).is_some() {
+                    ui.horizontal_wrapped(add_contents);
                 } else {
                     ui.vertical(add_contents);
                 }
