@@ -124,8 +124,10 @@ impl_hteg! { Label, html::forms::Label, html::forms::builders::LabelBuilder}
 impl_hteg! { Input, html::forms::Input, html::forms::builders::InputBuilder}
 // html::inline_text::Span
 impl_hteg! { Span, html::inline_text::Span, html::inline_text::builders::SpanBuilder}
+// html::forms::TextArea
+impl_hteg! { TextArea, html::forms::TextArea, html::forms::builders::TextAreaBuilder}
 
-// Divisions with text
+/* Divisions with .text() method */
 impl_hteg_text! { Division, html::text_content::Division, html::text_content::builders::DivisionBuilder}
 // Paragraphs with text
 impl_hteg_text! { Paragraph, html::text_content::Paragraph, html::text_content::builders::ParagraphBuilder}
