@@ -25,12 +25,15 @@ fn main() {
 
     let mut code = "pub static BUILTIN_PLUGINS: [(&str, &[u8]); 0] = [];".to_string();
 
-    if let Ok(dir) = std::fs::read_dir(project_root.join(dir_path)) {
+    if let Ok(dir) = std::fs::read_dir(project_root.join(&dir_path)) {
         let this_root_crate = env::var("CARGO_PKG_NAME").unwrap_or_default();
 
         let file_paths: Vec<PathBuf> = dir
             .filter_map(|entry| {
                 let path = entry.ok()?.path();
+
+                eprintln!("Checking path: {:?}", path);
+
                 path.extension()
                     // filter on 1) wasm files only, 2) not named the same as root crate
                     .filter(|&ext| {

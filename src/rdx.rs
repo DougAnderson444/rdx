@@ -159,6 +159,7 @@ impl Inner for State {
 
 /// The plugin and all the details required to run it,
 /// like the [rhai::Engine] and the [egui::Context]
+#[derive(Clone)]
 pub struct PluginDeets<T: Inner + Send> {
     /// The name of the plugin
     name: String,
