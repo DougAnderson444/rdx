@@ -13,7 +13,7 @@ members = [
 
 [package]
 name = "rdx"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Doug Anderson <doug@peerpiper.io>"]
 edition = "2021"
 include = ["LICENSE-APACHE", "LICENSE-MIT", "**/*.rs", "Cargo.toml"]
