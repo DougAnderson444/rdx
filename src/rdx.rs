@@ -222,6 +222,7 @@ impl<T: Inner + Clone + Send + Sync + 'static> PluginDeets<T> {
             // Options are only Window, Area, CentralPanel, SidePanel, TopBottomPanel
             egui::Window::new(name.clone())
                 .resizable(true)
+                .max_size(ctx.available_rect().size())
                 .max_width(ctx.available_rect().width())
                 .show(&ctx, |ui| {
                     // [browser]: unwrap the sendwrapper to get the plugin

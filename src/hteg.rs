@@ -2,6 +2,7 @@
 mod element_parser;
 mod types;
 
+use egui::TextStyle;
 use element_parser::Parser;
 use html_to_egui::{Action, Selectors};
 use rhai::CallFnOptions;
@@ -97,11 +98,18 @@ impl HtmlToEgui {
                 };
 
                 ui.set_max_width(ui.available_width());
+
                 // Style the div as a flex row if the style has the FlexRow selector
                 if classes.get(&Selectors::FlexRow).is_some() {
-                    ui.horizontal_wrapped(add_contents);
+                    ui.horizontal_wrapped(|ui| {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), add_contents)
+                    });
                 } else {
-                    ui.vertical(add_contents);
+                    tracing::trace!("Vertical");
+                    // a vertical layout that can shrink and grow as the parent Window is resized
+                    ui.vertical(|ui| {
+                        ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), add_contents);
+                    });
                 }
             }
             HtmlElement::Button(button) => {
@@ -217,9 +225,14 @@ impl HtmlToEgui {
                 let mut scope = lock.store_mut().data_mut().scope_mut();
 
                 if let Some(mut val) = scope.get_value::<String>(var_name.as_str()) {
-                    let single_line = egui::TextEdit::singleline(&mut val)
-                        .desired_width(400.0)
+                    let mut single_line = egui::TextEdit::singleline(&mut val)
+                        .desired_width(ui.available_width())
                         .password(is_password);
+
+                    if input.classes().get(&Selectors::Monospace).is_some() {
+                        single_line = single_line.font(TextStyle::Monospace);
+                    }
+
                     let response = ui.add(single_line);
                     if response.changed() {
                         // update the scope variable
@@ -271,7 +284,10 @@ impl HtmlToEgui {
             // TextArea is similar to Input, but it's multiline
             // Another difference is the templace variable is extracted from placeholder, not value
             // attribute (there isn't a value attribute for textarea)
-            HtmlElement::TextArea { placeholder } => {
+            HtmlElement::TextArea {
+                placeholder,
+                classes,
+            } => {
                 let Some(TemplatePart::Dynamic(var_name)) = placeholder.parts.first() else {
                     tracing::error!("No variable name found in placeholder");
                     // nowhere to save the input, returning early
@@ -296,10 +312,17 @@ impl HtmlToEgui {
                         val
                     });
 
-                let response = ui.add_sized(
-                    ui.available_size(),
-                    egui::TextEdit::multiline(&mut val).desired_rows(5),
-                );
+                let mut multiline = egui::TextEdit::multiline(&mut val).desired_rows(5);
+                if classes.get(&Selectors::Monospace).is_some() {
+                    multiline = multiline.font(TextStyle::Monospace);
+                }
+
+                // if text-black class, set the color to black
+                if classes.get(&Selectors::TextBlack).is_some() {
+                    multiline = multiline.text_color(egui::Color32::BLACK);
+                }
+
+                let response = ui.add_sized(ui.available_size(), multiline);
 
                 if response.changed() {
                     scope.set_value(var_name.as_str(), val.clone());

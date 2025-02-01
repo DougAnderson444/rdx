@@ -113,6 +113,8 @@ pub enum HtmlElement {
     TextArea {
         /// The text content of the element.
         placeholder: Template,
+        /// Classes
+        classes: HashSet<Selectors>,
     },
 }
 
@@ -170,6 +172,8 @@ pub struct Input {
     evt_handlers: Vec<EvtHandler>,
     /// The variable name of the [rhaii:Scope] the imput is bound to
     var_name: String,
+    /// The classes of the input element.
+    classes: HashSet<Selectors>,
 }
 
 impl Input {
@@ -199,6 +203,11 @@ impl Input {
     /// The input element's template value as [Template]
     pub fn template(&self) -> &Template {
         &self.value
+    }
+
+    /// The input element's classes
+    pub fn classes(&self) -> &HashSet<Selectors> {
+        &self.classes
     }
 }
 
@@ -296,6 +305,30 @@ impl HtmlElement {
                     .collect::<Vec<_>>()
                     .concat();
 
+                // what we really want to do in order to make this
+                // matching type safe and extensible, is:
+                // 1. Get the class attribute
+                // 2. Split the value on whitespace to get each class name
+                // 3. Match each class name to a DivSelectors variant, if it exists (each
+                //    DivSelectors maps to a &str, which is available .as_str(), AsRef<str> or even
+                //    Deref)
+                // 4. If it exists, set it to the style
+                let mut classes = HashSet::default();
+                attrs.borrow().iter().for_each(|attr| {
+                    if *attr.name.local == *"class" {
+                        let s: &str = &attr.value;
+
+                        // split on whitespace
+                        for s in s.split_whitespace() {
+                            if let Ok(selector) = Selectors::try_from(s) {
+                                classes.insert(selector);
+                            } else {
+                                tracing::warn!("Invalid class name: {}", s);
+                            }
+                        }
+                    }
+                });
+
                 match tag.as_str() {
                     Self::HTML => Some(HtmlElement::Html { children }),
                     Self::DIV => {
@@ -310,24 +343,6 @@ impl HtmlElement {
                             })
                             .collect::<Vec<_>>()
                             .join(" ");
-
-                        // what we really want to do in order to make this
-                        // matching type safe and extensible, is:
-                        // 1. Get the class attribute
-                        // 2. Split the value on whitespace to get each class name
-                        // 3. Match each class name to a DivSelectors variant, if it exists (each
-                        //    DivSelectors maps to a &str, which is available .as_str(), AsRef<str> or even
-                        //    Deref)
-                        // 4. If it exists, set it to the style
-                        let mut classes = HashSet::default();
-                        attrs.borrow().iter().for_each(|attr| {
-                            if *attr.name.local == *"class" {
-                                let s: &str = &attr.value;
-                                if let Ok(selector) = Selectors::try_from(s) {
-                                    classes.insert(selector);
-                                }
-                            }
-                        });
 
                         Some(HtmlElement::Div {
                             id,
@@ -382,6 +397,7 @@ impl HtmlElement {
                             value: template,
                             evt_handlers,
                             var_name: var_name.to_string(),
+                            classes,
                         }))
                     }
                     Self::LABEL => {
@@ -405,6 +421,7 @@ impl HtmlElement {
                             .unwrap_or_default();
                         Some(HtmlElement::TextArea {
                             placeholder: Template::new(&placeholder),
+                            classes,
                         })
                     }
                     _ => None,
@@ -453,7 +470,7 @@ impl HtmlElement {
             HtmlElement::Button(Button { template, .. }) => template,
             HtmlElement::Input(Input { value, .. }) => value,
             HtmlElement::Text { contents } => contents,
-            HtmlElement::TextArea { placeholder } => placeholder,
+            HtmlElement::TextArea { placeholder, .. } => placeholder,
         }
     }
 }
@@ -511,6 +528,8 @@ fn parse_evt_handlers(attrs: &RefCell<Vec<markup5ever::interface::Attribute>>) -
 
 #[cfg(test)]
 mod tests {
+    use markup5ever_rcdom::Node;
+
     use super::*;
 
     // test EvtHandler
@@ -523,5 +542,34 @@ mod tests {
         assert_eq!(evt_handler.ty, Action::OnClick);
         assert_eq!(evt_handler.details.function, "function_name");
         assert_eq!(evt_handler.details.args, vec!["arg1", "arg2"]);
+    }
+
+    // test grid and grid-cols- classes
+    #[test]
+    fn test_grid_classes() {
+        let mut classes = HashSet::default();
+        let grid = Selectors::try_from("grid").unwrap();
+        let grid_cols = Selectors::try_from("grid-cols-2").unwrap();
+        classes.insert(grid);
+        classes.insert(grid_cols);
+
+        assert_eq!(classes.len(), 2);
+        assert!(classes.contains(&grid));
+        assert!(classes.contains(&grid_cols));
+    }
+
+    // make fake NodeData::Element with class="grid grid-cols-2"
+    #[test]
+    fn test_from_node() {
+        use html5ever::*;
+        let el = NodeData::Element {
+            name: html5ever::QualName::new(None, ns!(), "div".into()),
+            attrs: RefCell::new(vec![Attribute {
+                name: QualName::new(None, ns!(), "class".into()),
+                value: "grid grid-cols-2".to_string().into(),
+            }]),
+            template_contents: RefCell::new(None),
+            mathml_annotation_xml_integration_point: false,
+        };
     }
 }
