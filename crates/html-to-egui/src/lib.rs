@@ -29,6 +29,9 @@ pub use handler::Handler;
 mod selectors;
 pub use selectors::*;
 
+mod style;
+pub use style::*;
+
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
