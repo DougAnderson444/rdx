@@ -22,30 +22,6 @@ pub enum Selectors {
     GridCols4,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Num {
-    One,
-    Two,
-    Three,
-    Four,
-    Five,
-    Six,
-}
-
-impl From<u8> for Num {
-    fn from(val: u8) -> Self {
-        match val {
-            1 => Num::One,
-            2 => Num::Two,
-            3 => Num::Three,
-            4 => Num::Four,
-            5 => Num::Five,
-            6 => Num::Six,
-            _ => Num::One,
-        }
-    }
-}
-
 impl Selectors {
     /// Constant for the flex row selector.
     const FLEX_ROW: &'static str = "flex-row";
