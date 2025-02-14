@@ -40,8 +40,13 @@ pub use wasm_component_layer::{
     ListType, RecordType, ResourceOwn, ResourceType, Store, Value, ValueType,
 };
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use wasmtime_runtime_layer as runtime_layer;
+// If android, use wasmi_runtime_layer
+#[cfg(target_os = "android")]
+pub use wasmi_runtime_layer as runtime_layer;
+
+// if not android AND not wasm32, use wasmtime_runtime_layer
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
+pub use wasmi_runtime_layer as runtime_layer;
 
 #[cfg(target_arch = "wasm32")]
 pub use js_wasm_runtime_layer as runtime_layer;

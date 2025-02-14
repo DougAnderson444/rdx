@@ -66,8 +66,12 @@ env_logger = "0.11"
 rhai = { version = "1.19", features = ["sync", "serde"] }
 wasmparser = "0.221"
 # TODO: Feature gate this: Could choose wasmi or wasmtime.
-wasmtime_runtime_layer = "26.0.0"
+wasmi_runtime_layer = "0.40.0"
 tokio = { version = "1", features = ["full"] }
+
+# wasmi vs wasmitme? wasmtime only if not os android and not wasm32
+[target.'cfg(all(not(target_os = "android"), not(target_arch = "wasm32")))'.dependencies]
+# wasmtime_runtime_layer = "26.0.0"
 
 # For web builds:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
